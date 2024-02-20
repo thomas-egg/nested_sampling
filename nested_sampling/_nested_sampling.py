@@ -102,6 +102,9 @@ class NestedSampling(object):
         self.iter_number = 0
         self.failed_mc_walks = 0
         self._mc_niter = 0 # total number of monte carlo iterations
+
+        # Evidence/Partition Function
+        self.Z = 0.0
         
     ####################
     # Functions for MC #
@@ -293,8 +296,32 @@ class NestedSampling(object):
         self.add_replica(r)
         self.iter_number += 1
 
+        # Add to Z
+        self.Z += (np.exp(-Emax)) * (1 / (self.iter_number + 1))
+
         # Test to make sure sizes match
         if self.nreplicas != len(self.replicas):
 
             # Throw error
             raise Exception('Size mismatch in number of replicas!')
+
+    #######
+    # RUN #
+    #######
+
+    def run_sampler(steps):
+        '''
+        Function to run NS until convergence criteria is met
+
+        IDEA FOR NOW (Skilling et al. 2006):
+        if Z_live / Z_i <= eps -> TERMINATE
+
+        @param eps : epsilon for termination
+        '''
+
+        # While termination condition not met
+        i = 0
+        while i < steps:
+
+            # Run
+            self.one_iteration()
