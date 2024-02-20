@@ -4,6 +4,40 @@ import numpy as np
 import sys
 import multiprocessing as mp
 
+class Replica(object):
+    '''
+    Class for representing a live point
+
+    Parameters
+    ----------
+    x : array
+        the coordinates
+    energy : float
+        configurational energy of the point
+    niter : int
+        number of MC iterations for this point
+    from_random : bool
+        boolean for if this walker was spawned randomly
+    '''
+
+    def __init__(self, x, energy, niter=0, from_random=True):
+
+        # Copy values
+        self.x = x
+        self.energy = energy
+        self.niter = niter
+        self.from_random = from_random
+
+    def copy(self)
+        '''
+        Return a copy of the replica
+        
+        @return copy
+        '''
+
+        # Return
+        return copy.deepcopy(self)
+
 class NestedSampling(object):
     '''
     Class for implementing the Nested Sampling algorithm
