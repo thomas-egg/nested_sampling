@@ -2,6 +2,9 @@
 import multiprocessing as mp
 import numpy as np
 
+# For MC with mcpele
+from mcpele.monte_carlo import _BaseMCRunner
+
 def random_displacement(x, stepsize):
     '''
     Function for taking random step
@@ -125,7 +128,7 @@ class MCWalker(object):
         # Return
         return res
 
-    class MCWalkerParallelWrapper(mp.Process):
+class MCWalkerParallelWrapper(mp.Process):
     """
     Uses multiprocessing to run MC in a separate process
     """
@@ -165,3 +168,29 @@ class MCWalker(object):
             # Anything else, throw error
             else:
                 raise "error: unknown message: %s\n%s" % (self.name, message)
+
+class MCWalker_mcpele(_BaseMCRunner):
+    '''
+    MCWalker with mcpele
+
+    Parameters
+    ----------
+    potential : pele potential
+        potential energy function to evaluate at steps
+    x : array
+        coordinates of the walker (supply initial, these get updated)
+    temperature : float
+        temperature to conduct sampling at, if athermal use 1
+    nsteps : int
+        number of steps to take
+    '''
+
+    def set_control(self, temp):
+        '''
+        Function to set temperature of system
+
+        @param temp : temperature to set
+        '''
+
+        # Set temp
+        self.temperature = temp

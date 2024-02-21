@@ -82,7 +82,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=True, max_stepsize=0.5, iprint=1, cpfile=None, cpfreq=10000, cpstart = False, dispatcher_URI=None, serializer='pickle'):
+    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=10000, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False):
 
         # Initialize class variables
         self.nproc = nproc
@@ -103,6 +103,9 @@ class NestedSampling(object):
         self.failed_mc_walks = 0
         self._mc_niter = 0 # total number of monte carlo iterations
 
+        # use mcpele or not
+        self.use_mcpele = use_mcpele
+
         # Evidence/Partition Function
         self.Z = 0.0
         
@@ -110,7 +113,7 @@ class NestedSampling(object):
     # Functions for MC #
     ####################
 
-    def do_serial_MC(self, r, Emax):
+    def run_MC(self, r, Emax):
         '''
         Function to run MC on a replica WITHOUT parallelization.
 
@@ -125,10 +128,20 @@ class NestedSampling(object):
 
         # Save initial replica and random seed
         rsave = r
-        seed = np.randim.randint(0, sys.maxint)
+        seed = np.random.randint(0, sys.maxint)
 
-        # Run walk
-        res = self.mc_walker(r.x, self.stepsize, Emax, r.energy, seed)
+        # mcpele implementation
+        if ues_mcpele:
+
+            # Run MC
+            self.mc.set_takestep(self.stepsize)
+            res = self.mc.run()
+        
+        # Pure Python
+        else:
+
+            # Run walk
+            res = self.mc_walker(r.x, self.stepsize, Emax, r.energy, seed)
 
         # Update replica
         r.x = res.x
@@ -148,45 +161,6 @@ class NestedSampling(object):
 
         # Return
         return r, res
-
-    def serial_MC_chain(self, configs, Emax):
-        '''
-        Function to run MC for all replicas 
-
-        @param configs : configurations of all replicas
-        @param Emax : the maximum energy
-        '''
-
-        # Set up run
-        assert len(configs) == self.nproc
-
-        # Run MC - no parallelization
-        if self.nproc == 1:
-            
-            # Run MC
-            rnew, res = do_serial_MC(configs[0], Emax)
-            rnew_list = [rnew]
-            res = [res]
-
-        # Add steps
-        self._mc_iter += sum((result.nsteps for result in res))
-
-        # Loop over results and configurations
-        for result, r in zip(res, configs):
-
-            # Count failed walks
-            if result.naccept == 0:
-
-                # Increment
-                self.failed_mc_walks += 1
-                sys.stdout.write("WARNING: step: %d accept %g Enew %g Eold %g Emax %g Emin %g stepsize %g\n" % 
-                                 (self.iter_number, float(result.naccept) / result.nsteps,
-                                  result.energy, r.energy, Emax, self.replicas[0].energy,
-                                  self.stepsize))
-        
-        # Adjust stepsize and return new positions
-        self.adjust_stepsize(res)
-        return rnew_list       
 
     ###########################
     # Nested Sampling Updates #
@@ -290,7 +264,7 @@ class NestedSampling(object):
 
         # Run MC for replica
         r = self.get_starting_configurations_from_replicas
-        rnew = self.serial_MC_chain()
+        rnew = self.run_MC()
 
         # Finish off step
         self.add_replica(r)
@@ -319,9 +293,39 @@ class NestedSampling(object):
         @param eps : epsilon for termination
         '''
 
+        # Histogram
+        hist = np.hist()
+
         # While termination condition not met
         i = 0
         while i < steps:
 
             # Run
             self.one_iteration()
+            i += 1
+
+            # get positions at certain intervals
+            if i % iprint == 0:
+
+                # 
+
+    ########
+    # DATA #
+    ########
+
+    def get_positions(self):
+        '''
+        Function to return positions fo the replicas
+
+        @return pos : replica positions
+        '''
+
+        # Iterate
+        pos = []
+        for r in self.replicas:
+
+            # save
+            pos.append(r.x)
+
+        # Return
+        return pos
