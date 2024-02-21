@@ -28,7 +28,7 @@ class Replica(object):
         self.niter = niter
         self.from_random = from_random
 
-    def copy(self)
+    def copy(self):
         '''
         Return a copy of the replica
         
@@ -241,7 +241,7 @@ class NestedSampling(object):
             # Adjust stepsize
             self.stepsize /= f
 
-    def get_new_Emax(self)
+    def get_new_Emax(self):
         '''
         Function to return new Emax
 
@@ -303,11 +303,6 @@ class NestedSampling(object):
             # Run
             self.one_iteration()
             i += 1
-
-            # get positions at certain intervals
-            if i % iprint == 0:
-
-                # 
 
     ########
     # DATA #

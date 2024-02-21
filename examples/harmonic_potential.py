@@ -35,7 +35,7 @@ class HarmonicPotential(object):
         assert len(x) == self.ndim
 
         # Compute energy
-        E = 0.5 * k * (x.dot(x))
+        E = 0.5 * self.k * (x.dot(x))
 
         # Return
         return E
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     # Potential, replica list, MC walker, and finally NS
     pot = HarmonicPotential(ndim)
-    replicas = [Replica(x, pot.get_energy(x)) for np.random.random(2) * boxlen in range(len(x))]
+    replicas = [Replica(x, pot.get_energy(x)) for np.random.random(2) * boxlen in range(npoints)]
     mc = MCWalker(pot)
     ns = NestedSampling(replicas, mc)
 

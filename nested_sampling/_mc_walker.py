@@ -1,6 +1,7 @@
 # Import libraries
 import multiprocessing as mp
 import numpy as np
+from nested_sampling import Result
 
 # For MC with mcpele
 from mcpele.monte_carlo import _BaseMCRunner
@@ -59,7 +60,7 @@ class MCWalker(object):
         # Set variables
         self.potential = potential
         self.takestep = takestep
-        self.accept_test = accepted
+        self.accept_test = accept_test
         self.events = events
         self.mciter = mciter
 
@@ -86,9 +87,13 @@ class MCWalker(object):
         if self.accept_test is not None:
             if not self.accept_test(x, 0.):
                 raise Exception("initial configuration for monte carlo chain failed configuration test")
+        
+        # Variables for loop
+        x = x0.copy()
+        naccept = 0
 
         # Run for predetermined number of steps
-        for i in range(mciter):
+        for i in range(self.mciter):
 
             # New x
             xnew = x.copy()
