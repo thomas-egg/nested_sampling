@@ -1,6 +1,6 @@
 # Import libraries
-import argparse
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Import necessary functionality
 from nested_sampling import NestedSampling, MCWalker, Replica
@@ -46,18 +46,21 @@ class HarmonicPotential(object):
 if __name__ == '__main__':
 
     # Initialize variables
-    boxlen = 2
+    boxlen = 3
     ndim = 2
-    npoints = 100
+    npoints = 1000
 
     # Potential, replica list, MC walker, and finally NS
     pot = HarmonicPotential(ndim)
-    replicas = [Replica(x, pot.get_energy(x)) for np.random.random(2) * boxlen in range(npoints)]
+    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=2) for _ in range(npoints)]]
     mc = MCWalker(pot)
     ns = NestedSampling(replicas, mc)
 
     # Run sampler
-    ns.run_sampler(100000)
+    pos = np.array(ns.run_sampler(6000))
 
     # Plot
-    plt.hist()
+    x = pos[:,0]
+    y = pos[:,1]
+    hist = plt.hist2d(x, y, bins=40)
+    plt.savefig('plot.png')

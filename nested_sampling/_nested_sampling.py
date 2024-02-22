@@ -1,5 +1,6 @@
 # Import libraries
 import random
+import copy
 import numpy as np
 import sys
 import multiprocessing as mp
@@ -125,13 +126,14 @@ class NestedSampling(object):
 
         # Perform with one processor
         assert self.nproc == 1
+        r = r[0]
 
         # Save initial replica and random seed
         rsave = r
-        seed = np.random.randint(0, sys.maxint)
+        seed = np.random.randint(0, 1000)
 
         # mcpele implementation
-        if ues_mcpele:
+        if self.use_mcpele:
 
             # Run MC
             self.mc.set_takestep(self.stepsize)
@@ -147,10 +149,10 @@ class NestedSampling(object):
         r.x = res.x
         r.energy = res.energy
         r.niter += res.nsteps
-        self.adjust_stepsize(res)
+        self.adjust_stepsize([res])
 
         # If verbose, print data
-        if verbose:
+        if self.verbose:
 
             # Print statements
             print(f'step: {self.iter_number}')
@@ -228,7 +230,7 @@ class NestedSampling(object):
         # Set factor to adjust by and ratios
         f = 0.8
         target_ratio = 0.5
-        current_ratio = float(sum(r.naccept for r in res)) / sum(r.stsps for r in res)
+        current_ratio = float(sum(r.naccept for r in res)) / sum(r.nsteps for r in res)
 
         # Test if we are near target
         if current_ratio < target_ratio:
@@ -260,11 +262,11 @@ class NestedSampling(object):
 
         # Pop
         self.sort_replicas()
-        self.pop_replicas()
+        self.pop_replica()
 
         # Run MC for replica
-        r = self.get_starting_configurations_from_replicas
-        rnew = self.run_MC()
+        r = self.get_starting_configurations_from_replicas()
+        rnew = self.run_MC(r, Emax)
 
         # Finish off step
         self.add_replica(r)
@@ -283,7 +285,7 @@ class NestedSampling(object):
     # RUN #
     #######
 
-    def run_sampler(steps):
+    def run_sampler(self, steps):
         '''
         Function to run NS until convergence criteria is met
 
@@ -294,7 +296,7 @@ class NestedSampling(object):
         '''
 
         # Histogram
-        hist = np.hist()
+        pos = []
 
         # While termination condition not met
         i = 0
@@ -303,6 +305,17 @@ class NestedSampling(object):
             # Run
             self.one_iteration()
             i += 1
+
+            # Test
+            if i % self.iprint == 0:
+                pos += self.get_positions()
+
+        # Print result Z
+        print(self.Z)
+        
+
+        # Return
+        return pos
 
     ########
     # DATA #
@@ -320,7 +333,7 @@ class NestedSampling(object):
         for r in self.replicas:
 
             # save
-            pos.append(r.x)
+            pos.append(r.x.tolist())
 
         # Return
         return pos
