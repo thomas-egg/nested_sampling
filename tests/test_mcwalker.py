@@ -1,5 +1,5 @@
 # Import MC
-from nested_sampling import MCWalker, random_displacement, Replica
+from nested_sampling import MCWalker, MCWalker_mcpele, random_displacement, Replica
 import unittest
 import numpy as np
 
@@ -38,6 +38,7 @@ class HarmonicPotential(object):
         # Return
         return E
 
+# Class for testing Python MCMC
 class TestMC(unittest.TestCase):
 
     def setUp(self):
@@ -48,7 +49,6 @@ class TestMC(unittest.TestCase):
         self.r = Replica(self.x, self.pot.get_energy(self.x))
         self.Emax = 6
         self.mc = MCWalker(self.pot)
-        print('test')
 
     def test_mc(self):
 
@@ -56,3 +56,16 @@ class TestMC(unittest.TestCase):
         res = self.mc(self.r.x, 0.1, self.Emax, self.r.energy)
         print(res.x)
         self.assertNotEqual(res.x[0], self.x[0])
+
+# Class for testing mcpele implementation
+class TestMC_mcpele(unittest.TestCase):
+
+    def setUp(self):
+
+        # Initialize variables
+        self.pot = HarmonicPotential(2)
+        self.x = np.array([1.0, 1.0])
+        self.r = Replica(self.x, self.pot.get_energy(self.x))
+        self.Emax = 6
+        self.nsamples = 100
+        self.mc = MCWalker_mcpele(self.pot, x, 1, self.nsamples)
