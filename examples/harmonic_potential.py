@@ -52,15 +52,15 @@ if __name__ == '__main__':
 
     # Potential, replica list, MC walker, and finally NS
     pot = HarmonicPotential(ndim)
-    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=2) for _ in range(npoints)]]
+    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=ndim) for _ in range(npoints)]]
     mc = MCWalker(pot)
     ns = NestedSampling(replicas, mc)
 
     # Run sampler
-    pos = np.array(ns.run_sampler(6000))
+    pos = np.array(ns.run_sampler(10000))
 
     # Plot
-    x = pos[:,0]
-    y = pos[:,1]
-    hist = plt.hist2d(x, y, bins=40)
-    plt.savefig('plot.png')
+    #x = pos[:,0]
+    #y = pos[:,1]
+    #hist = plt.hist2d(x, y, bins=40)
+    #plt.savefig('plot.png')

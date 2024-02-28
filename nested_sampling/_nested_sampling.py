@@ -83,7 +83,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=10000, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False):
+    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=10000, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
 
         # Initialize class variables
         self.nproc = nproc
@@ -103,12 +103,18 @@ class NestedSampling(object):
         self.iter_number = 0
         self.failed_mc_walks = 0
         self._mc_niter = 0 # total number of monte carlo iterations
+        self.xqueue = [1] # queue for computing the weight associated with a given likelihood contour
 
         # use mcpele or not
         self.use_mcpele = use_mcpele
+        if self.use_mcpele:
+
+            # Set up sampler for MC
+            self.step = sampler
 
         # Evidence/Partition Function
         self.Z = 0.0
+        self.Eold = 0
         
     ####################
     # Functions for MC #
@@ -243,6 +249,12 @@ class NestedSampling(object):
             # Adjust stepsize
             self.stepsize /= f
 
+        # Test max stepsize
+        if self.stepsize > self.max_stepsize:
+
+            # Set to max
+            self.stepsize = self.max_stepsize
+
     def get_new_Emax(self):
         '''
         Function to return new Emax
@@ -266,20 +278,37 @@ class NestedSampling(object):
 
         # Run MC for replica
         r = self.get_starting_configurations_from_replicas()
-        rnew = self.run_MC(r, Emax)
+        rnew, res = self.run_MC(r, Emax)
 
         # Finish off step
-        self.add_replica(r)
+        self.add_replica([rnew])
         self.iter_number += 1
 
-        # Add to Z
-        self.Z += (np.exp(-Emax)) * (1 / (self.iter_number + 1))
+        # Sample compression from distribution
+        t = np.random.beta(len(self.replicas), 1)
+
+        # Z addition
+        self.xqueue.append(self.xqueue[-1] * t)
+
+        # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
+        if len(self.xqueue) == 3:
+
+            # Add to Z (trapezoid rule)
+            self.compound_Z(self.Eold)
+
+        elif len(self.xqueue) > 3:
+
+            # Error
+            raise Exception('volume queue exceeds size of 3!')
 
         # Test to make sure sizes match
         if self.nreplicas != len(self.replicas):
 
             # Throw error
             raise Exception('Size mismatch in number of replicas!')
+
+        # Save energy from this step
+        self.Eold = Emax
 
     #######
     # RUN #
@@ -337,3 +366,10 @@ class NestedSampling(object):
 
         # Return
         return pos
+
+    def compound_Z(self, Eold):
+
+        # Add to Z (trapezoid rule)
+        w = .5 * (self.xqueue[0] - self.xqueue[2])
+        self.Z += (np.exp(-Eold)) * w
+        self.xqueue.pop(0) 
