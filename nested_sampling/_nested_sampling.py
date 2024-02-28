@@ -285,7 +285,7 @@ class NestedSampling(object):
         self.iter_number += 1
 
         # Sample compression from distribution
-        t = np.random.beta(len(self.replicas), 1)
+        t = np.random.beta(self.nreplicas, 1)
 
         # Z addition
         self.xqueue.append(self.xqueue[-1] * t)
@@ -336,7 +336,7 @@ class NestedSampling(object):
             i += 1
 
             # Test
-            if i % self.iprint == 0:
+            if i % self.iprint == 0 or i == 1:
                 pos += self.get_positions()
 
         # Print result Z
@@ -371,5 +371,6 @@ class NestedSampling(object):
 
         # Add to Z (trapezoid rule)
         w = .5 * (self.xqueue[0] - self.xqueue[2])
+        print(f'{w}\t{np.exp(-Eold)}\t{Eold}')
         self.Z += (np.exp(-Eold)) * w
         self.xqueue.pop(0) 

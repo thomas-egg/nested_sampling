@@ -45,22 +45,30 @@ class HarmonicPotential(object):
 ########
 if __name__ == '__main__':
 
+    xer = np.array([1, 1.8])
+
     # Initialize variables
-    boxlen = 3
+    boxlen = 3.0
     ndim = 2
-    npoints = 1000
+    npoints = 100
 
     # Potential, replica list, MC walker, and finally NS
     pot = HarmonicPotential(ndim)
+    print(pot.get_energy(xer))
+    '''
     replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=ndim) for _ in range(npoints)]]
     mc = MCWalker(pot)
     ns = NestedSampling(replicas, mc)
 
     # Run sampler
-    pos = np.array(ns.run_sampler(10000))
+    pos = np.array(ns.run_sampler(1000))
 
     # Plot
-    #x = pos[:,0]
-    #y = pos[:,1]
-    #hist = plt.hist2d(x, y, bins=40)
-    #plt.savefig('plot.png')
+    x = pos[:,0]
+    y = pos[:,1]
+
+    plt.scatter(x[-100:], y[-100:])
+    plt.savefig(f'bsplot.png')
+    plt.scatter(x[:100], y[:100])
+    plt.savefig(f'otherbsplot.png')
+    '''
