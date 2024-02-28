@@ -5,6 +5,7 @@ from nested_sampling import Result
 
 # For MC with mcpele
 from mcpele.monte_carlo import _BaseMCRunner
+from mcpele.monte_carlo import SampleGaussian
 
 def random_displacement(x, stepsize):
     '''

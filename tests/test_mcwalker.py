@@ -1,5 +1,7 @@
 # Import MC
 from nested_sampling import MCWalker, MCWalker_mcpele, random_displacement, Replica
+from pele.potentials import Harmonic
+from mcpele.monte_carlo import SampleGaussian
 import unittest
 import numpy as np
 
@@ -63,9 +65,20 @@ class TestMC_mcpele(unittest.TestCase):
     def setUp(self):
 
         # Initialize variables
-        self.pot = HarmonicPotential(2)
+        self.origin = np.array([0.0,0.0])
+        self.pele_pot = Harmonic(self.origin, 1.0, 2)
         self.x = np.array([1.0, 1.0])
-        self.r = Replica(self.x, self.pot.get_energy(self.x))
+        self.r = Replica(self.x, self.pele_pot.getEnergy(self.x))
         self.Emax = 6
         self.nsamples = 100
-        self.mc = MCWalker_mcpele(self.pot, x, 1, self.nsamples)
+        self.step = SampleGaussian(123, 0.1, self.x)
+        self.mc = MCWalker_mcpele(self.pele_pot, self.x, 1, self.nsamples)
+        self.mc.set_takestep(self.step)
+
+    def test_mcpele(self):
+
+        # Test
+        self.mc.run()
+        res = self.mc.get_coords()
+        print(res)
+        self.assertNotEqual(res[0], self.x[0])
