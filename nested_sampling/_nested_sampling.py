@@ -115,6 +115,9 @@ class NestedSampling(object):
         # Evidence/Partition Function
         self.Z = 0.0
         self.Eold = 0
+        self.L = []
+        self.w = []
+        self.Zlist = []
         
     ####################
     # Functions for MC #
@@ -285,9 +288,9 @@ class NestedSampling(object):
         self.iter_number += 1
 
         # Sample compression from distribution
-        t = np.random.beta(self.nreplicas, 1)
+        t = np.max(np.random.uniform(0,1, self.nreplicas))
 
-        # Z addition
+        # Push volume to queue
         self.xqueue.append(self.xqueue[-1] * t)
 
         # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
@@ -338,13 +341,12 @@ class NestedSampling(object):
             # Test
             if i % self.iprint == 0 or i == 1:
                 pos += self.get_positions()
-
-        # Print result Z
-        print(self.Z)
         
 
         # Return
-        return pos
+        print(self.Z)
+        print(np.log(self.Z))
+        return self.Zlist, self.w, self.L
 
     ########
     # DATA #
@@ -371,6 +373,9 @@ class NestedSampling(object):
 
         # Add to Z (trapezoid rule)
         w = .5 * (self.xqueue[0] - self.xqueue[2])
-        print(f'{w}\t{np.exp(-Eold)}\t{Eold}')
-        self.Z += (np.exp(-Eold)) * w
+        l = np.exp(-Eold)
+        self.Z += l * w
+        self.L.append(l)
+        self.Zlist.append(l*w)
+        self.w.append(self.xqueue[1])
         self.xqueue.pop(0) 
