@@ -44,6 +44,23 @@ class HarmonicPotential(object):
 # MAIN #
 ########
 if __name__ == '__main__':
+    '''
+    HOW THIS WORKS
+    --------------
+
+    This is an example of how one might use Nested Sampling (NS) to calculate the 
+    evidence (partition function) associated with a simple 2-D Gaussian (harmonic potential).
+    We define an exponentiated harmonic potential as the Likelihood, and enforce a 
+    uniform spherical prior:
+
+    prior = (D/2)!/(pi^(D/2))
+
+    Analytical calculations with k = 1/(sigma^2):
+    Z = 0.02
+    log(Z) = -3.91
+
+    We then run the NS algorithm for some steps and see how we did.
+    '''
 
     # Initialize variables
     boxlen = 1.0
@@ -58,13 +75,11 @@ if __name__ == '__main__':
     ns = NestedSampling(replicas, mc)
 
     # Run sampler
-    Z, w, l = ns.run_sampler(5000)
+    Z, w, l = ns.run_sampler(1500)
 
     # Plot
-    plt.plot(w, Z)
-    plt.savefig('pl1.png')
-    plt.clf()
-
+    plt.ylabel('Likelihood')
+    plt.xlabel('$Log(X)$')
     plt.plot(np.log(w), l, marker='o')
-    plt.savefig('pl2.png')
+    plt.savefig('likelihood_vs_logX.png')
     
