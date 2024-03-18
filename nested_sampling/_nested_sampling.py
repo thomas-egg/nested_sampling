@@ -4,6 +4,7 @@ import copy
 import numpy as np
 import sys
 import multiprocessing as mp
+from joblib import Parallel
 
 class Replica(object):
     '''
@@ -123,18 +124,15 @@ class NestedSampling(object):
     # Functions for MC #
     ####################
 
-    def run_MC(self, r, Emax):
+    def serial_MC(self, r):
         '''
-        Function to run MC on a replica WITHOUT parallelization.
+        Function to run serial Monte Carlo WITHOUT parallelization
 
-        @param r : replica to propagate
-        @param Emax : maximum energy 
-        @return r : updated walker
-        @return res : MC result
-        ''' 
-
-        # Perform with one processor
-        assert self.nproc == 1
+        @param r : coordinates of replica
+        @return res : result
+        '''
+        
+        # Position
         r = r[0]
 
         # Save initial replica and random seed
@@ -147,23 +145,82 @@ class NestedSampling(object):
             # Run MC
             self.mc.set_takestep(self.stepsize)
             res = self.mc.run()
-        
+
         # Pure Python
         else:
 
             # Run walk
             res = self.mc_walker(r.x, self.stepsize, Emax, r.energy, seed)
 
-        # Update replica
-        r.x = res.x
-        r.energy = res.energy
-        r.niter += res.nsteps
-        self.adjust_stepsize([res])
+        # Return
+        return res
 
+    def parallel_MC(self, r):
+        '''
+        Function to run parallelized MC
+
+        @param r : coordinate list
+        '''
+
+        # Random seed
+        seed = np.random.randint(0, 1000)
+
+        # mcpele
+        if self.use_mcpele:
+            
+            # Run MC
+            self.mc.set_takestep(self.stepsize)
+            res = Parallel(n_jobs=self.nproc)(delayed(self.mc.run()) for r in self.replicas)
+
+        else:
+
+            # Run MC
+            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r, self.stepsize, self.Emax, r.energy, seed) for r in self.replicas)
+            
+
+    def run_MC(self, r, Emax):
+        '''
+        Function to run MC.
+
+        @param r : replica to propagate
+        @param Emax : maximum energy
+        @return r : updated walker
+        @return res : MC result
+        ''' 
+
+        # Perform with one processor
+        if self.nproc == 1:
+
+            # Save result
+            res = serial_MC(r)
+
+            # Update replica
+            r.x = res.x
+            r.energy = res.energy
+            r.niter += res.nsteps
+
+
+        # Perform with parallelization
+        else:
+
+            # Save results
+            res = parallel_MC(r)
+
+            # Update
+            for replica, result in zip(r, res):
+
+                # Save
+                replica.x = result.x
+                replica.energy = result.energy
+                replica.niter = result.nsteps
+            
+        # Update stepsize
+        self.adjust_stepsize([res])
+        
         # If verbose, print data
         if self.verbose:
 
-            # Print statements
+            # Print statistics
             print(f'step: {self.iter_number}')
             print(f'%accept: {float(res.naccept / res.nsteps)}')
             print(f'Enew: {res.energy}')
@@ -217,7 +274,15 @@ class NestedSampling(object):
         '''
         # choose a replica randomly
         assert len(self.replicas) == (self.nreplicas - self.nproc)
-        rlist = random.sample(self.replicas, self.nproc)
+
+        # If serial
+        if self.nproc == 1:
+            rlist = random.sample(self.replicas)
+
+        # Parallel 
+        else:
+            rlist = self.replicas
+
         self.starting_replicas = rlist
         
         # make a copy of the replicas so we don't modify the old ones
@@ -341,12 +406,6 @@ class NestedSampling(object):
             # Test
             if i % self.iprint == 0 or i == 1:
                 pos += self.get_positions()
-        
-
-        # Return
-        print(self.Z)
-        print(np.log(self.Z))
-        return self.Zlist, self.w, self.L
 
     ########
     # DATA #
