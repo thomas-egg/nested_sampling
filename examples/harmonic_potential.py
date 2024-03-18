@@ -69,10 +69,9 @@ if __name__ == '__main__':
 
     # Potential, replica list, MC walker, and finally NS
     pot = HarmonicPotential(ndim, k=1/(0.1**2))
-    
     replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=ndim) for _ in range(npoints)]]
     mc = MCWalker(pot)
-    ns = NestedSampling(replicas, mc, cpfreq=300, cpfile='chk.txt', enfile='en.txt')
+    ns = NestedSampling(replicas, mc, cpfreq=300, iprint=300, cpfile='chk.txt', enfile='en.txt')
 
     # Run sampler
     Z, w, l = ns.run_sampler(1500)

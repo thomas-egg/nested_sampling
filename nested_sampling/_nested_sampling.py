@@ -5,7 +5,7 @@ import numpy as np
 import sys
 import csv
 import multiprocessing as mp
-from joblib import Parallel
+from joblib import Parallel, delayed
 
 class Replica(object):
     '''
@@ -179,7 +179,7 @@ class NestedSampling(object):
         else:
 
             # Run MC
-            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r, self.stepsize, Emax, r.energy, seed) for r in self.replicas)
+            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r.x, self.stepsize, Emax, r.energy, seed) for r in self.replicas)
             
         # Return
         return res
@@ -280,7 +280,9 @@ class NestedSampling(object):
         Use existing replicas as starting configurations
         '''
         # choose a replica randomly
-        assert len(self.replicas) == (self.nreplicas - self.nproc)
+        print(self.nreplicas)
+        print(len(self.replicas))
+        assert len(self.replicas) == self.nreplicas
 
         # If serial
         if self.nproc == 1:
@@ -343,39 +345,50 @@ class NestedSampling(object):
         '''
         Function to run one iteration of the NS algorithm
         '''
-
         # New Emax
         Emax = self.get_new_Emax()
-
-        # Pop
-        self.sort_replicas()
-        self.pop_replica()
-
-        # Run MC for replica
         r = self.get_starting_configurations_from_replicas()
-        rnew, res = self.run_MC(r, Emax)
 
-        # Finish off step
-        self.add_replica([rnew])
+        # Serial
+        if self.nproc == 1:
+
+            # Pop
+            self.sort_replicas()
+            self.pop_replica()
+
+            # Run MC for replica
+ 
+            rnew, res = self.run_MC(r, Emax)
+
+            # Finish off step
+            self.add_replica([rnew])
+            
+            # Sample compression from distribution
+            t = np.max(np.random.uniform(0,1, self.nreplicas))
+
+            # COMPUTING EVIDENCE IN REAL TIME
+            # Push volume to queue
+            #self.xqueue.append(self.xqueue[-1] * t)
+
+            # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
+            #if len(self.xqueue) == 3:
+
+                # Add to Z (trapezoid rule)
+            #    self.compound_Z(self.Eold)
+
+            #elif len(self.xqueue) > 3:
+
+                # Error
+            #    raise Exception('volume queue exceeds size of 3!')
+
+        # Parallel
+        else:
+
+            # Run mc
+            self.replicas, res = self.run_MC(r, Emax)
+
+        # Update step
         self.iter_number += 1
-
-        # Sample compression from distribution
-        t = np.max(np.random.uniform(0,1, self.nreplicas))
-
-        # COMPUTING EVIDENCE IN REAL TIME
-        # Push volume to queue
-        #self.xqueue.append(self.xqueue[-1] * t)
-
-        # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
-        #if len(self.xqueue) == 3:
-
-            # Add to Z (trapezoid rule)
-        #    self.compound_Z(self.Eold)
-
-        #elif len(self.xqueue) > 3:
-
-            # Error
-        #    raise Exception('volume queue exceeds size of 3!')
 
         # Test to make sure sizes match
         if self.nreplicas != len(self.replicas):
