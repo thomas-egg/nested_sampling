@@ -84,7 +84,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=10000, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
+    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
 
         # Initialize class variables
         self.nproc = nproc
@@ -99,6 +99,7 @@ class NestedSampling(object):
         self.cpfreq = cpfreq
         self.cpfile = cpfile
         self.cpstart = cpstart
+        self.enfile = enfile
         self.max_energies = []
         self.store_all_energies = True        
         self.iter_number = 0
@@ -170,7 +171,7 @@ class NestedSampling(object):
             
             # Run MC
             self.mc.set_takestep(self.stepsize)
-            res = Parallel(n_jobs=self.nproc)(delayed(self.mc.run()) for r in self.replicas)
+            res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(self.mc.run()) for r in self.replicas)
 
         else:
 
@@ -355,19 +356,20 @@ class NestedSampling(object):
         # Sample compression from distribution
         t = np.max(np.random.uniform(0,1, self.nreplicas))
 
+        # COMPUTING EVIDENCE IN REAL TIME
         # Push volume to queue
-        self.xqueue.append(self.xqueue[-1] * t)
+        #self.xqueue.append(self.xqueue[-1] * t)
 
         # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
-        if len(self.xqueue) == 3:
+        #if len(self.xqueue) == 3:
 
             # Add to Z (trapezoid rule)
-            self.compound_Z(self.Eold)
+        #    self.compound_Z(self.Eold)
 
-        elif len(self.xqueue) > 3:
+        #elif len(self.xqueue) > 3:
 
             # Error
-            raise Exception('volume queue exceeds size of 3!')
+        #    raise Exception('volume queue exceeds size of 3!')
 
         # Test to make sure sizes match
         if self.nreplicas != len(self.replicas):
@@ -403,9 +405,14 @@ class NestedSampling(object):
             self.one_iteration()
             i += 1
 
-            # Test
+            # Write out energy
             if i % self.iprint == 0 or i == 1:
                 pos += self.get_positions()
+                self.write_out([i, self.Emax], self.enfile)
+
+            # Write to checkpoint
+            if i % self.cpfreq == 0:
+                 self.write_out([i, self.get_positions()])
 
     ########
     # DATA #
@@ -438,3 +445,16 @@ class NestedSampling(object):
         self.Zlist.append(l*w)
         self.w.append(self.xqueue[1])
         self.xqueue.pop(0) 
+
+    def write_out(self, data, fi):
+        '''
+        Function to write out data
+
+        @param data : data to write out
+        @param fi : file to write to
+        '''
+
+        # Open and write
+        with open(fi, "w") as file:
+            fi.write(Emax)
+            fi.close()
