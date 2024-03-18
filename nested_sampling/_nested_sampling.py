@@ -3,6 +3,7 @@ import random
 import copy
 import numpy as np
 import sys
+import csv
 import multiprocessing as mp
 from joblib import Parallel
 
@@ -125,11 +126,12 @@ class NestedSampling(object):
     # Functions for MC #
     ####################
 
-    def serial_MC(self, r):
+    def serial_MC(self, r, Emax):
         '''
         Function to run serial Monte Carlo WITHOUT parallelization
 
         @param r : coordinates of replica
+        @param Emax : max energy threshold
         @return res : result
         '''
         
@@ -156,11 +158,12 @@ class NestedSampling(object):
         # Return
         return res
 
-    def parallel_MC(self, r):
+    def parallel_MC(self, r, Emax):
         '''
         Function to run parallelized MC
 
         @param r : coordinate list
+        @param Emax : max energy threshold
         '''
 
         # Random seed
@@ -176,8 +179,10 @@ class NestedSampling(object):
         else:
 
             # Run MC
-            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r, self.stepsize, self.Emax, r.energy, seed) for r in self.replicas)
+            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r, self.stepsize, Emax, r.energy, seed) for r in self.replicas)
             
+        # Return
+        return res
 
     def run_MC(self, r, Emax):
         '''
@@ -193,9 +198,10 @@ class NestedSampling(object):
         if self.nproc == 1:
 
             # Save result
-            res = serial_MC(r)
+            res = self.serial_MC(r, Emax)
 
             # Update replica
+            r = r[0]
             r.x = res.x
             r.energy = res.energy
             r.niter += res.nsteps
@@ -205,7 +211,7 @@ class NestedSampling(object):
         else:
 
             # Save results
-            res = parallel_MC(r)
+            res = self.parallel_MC(r, Emax)
 
             # Update
             for replica, result in zip(r, res):
@@ -278,7 +284,7 @@ class NestedSampling(object):
 
         # If serial
         if self.nproc == 1:
-            rlist = random.sample(self.replicas)
+            rlist = random.sample(self.replicas, 1)
 
         # Parallel 
         else:
@@ -408,11 +414,14 @@ class NestedSampling(object):
             # Write out energy
             if i % self.iprint == 0 or i == 1:
                 pos += self.get_positions()
-                self.write_out([i, self.Emax], self.enfile)
+                self.write_out([i, self.Eold], self.enfile)
 
             # Write to checkpoint
             if i % self.cpfreq == 0:
-                 self.write_out([i, self.get_positions()])
+                 self.write_out([i, self.get_positions()], self.cpfile)
+
+        # Return
+        return self.Z, self.w, self.L
 
     ########
     # DATA #
@@ -453,8 +462,8 @@ class NestedSampling(object):
         @param data : data to write out
         @param fi : file to write to
         '''
-
+        print(data)
         # Open and write
-        with open(fi, "w") as file:
-            fi.write(Emax)
-            fi.close()
+        with open(fi, "w", newline='') as file:
+            csvwriter = csv.writer(file)
+            csvwriter.writerow(data)

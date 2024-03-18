@@ -72,7 +72,7 @@ if __name__ == '__main__':
     
     replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=-boxlen, high=boxlen, size=ndim) for _ in range(npoints)]]
     mc = MCWalker(pot)
-    ns = NestedSampling(replicas, mc)
+    ns = NestedSampling(replicas, mc, cpfreq=300, cpfile='chk.txt', enfile='en.txt')
 
     # Run sampler
     Z, w, l = ns.run_sampler(1500)
@@ -81,5 +81,5 @@ if __name__ == '__main__':
     plt.ylabel('Likelihood')
     plt.xlabel('$Log(X)$')
     plt.plot(np.log(w), l, marker='o')
-    plt.savefig('likelihood_vs_logX.png')
+    plt.savefig('test_plot.png')
     
