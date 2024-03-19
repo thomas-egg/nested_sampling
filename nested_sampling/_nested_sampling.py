@@ -85,7 +85,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
+    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, chkpt=False, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
 
         # Initialize class variables
         self.nproc = nproc
@@ -97,6 +97,7 @@ class NestedSampling(object):
         self.mc_walker = mc_walker
         self.stepsize = stepsize
         self.max_stepsize = max_stepsize
+        self.chkpt = chkpt
         self.cpfreq = cpfreq
         self.cpfile = cpfile
         self.cpstart = cpstart
@@ -156,9 +157,9 @@ class NestedSampling(object):
             res = self.mc_walker(r.x, self.stepsize, Emax, r.energy, seed)
 
         # Return
-        return res
+        return [res]
 
-    def parallel_MC(self, r, Emax):
+    def parallel_MC(self, Emax):
         '''
         Function to run parallelized MC
 
@@ -211,7 +212,7 @@ class NestedSampling(object):
         else:
 
             # Save results
-            res = self.parallel_MC(r, Emax)
+            res = self.parallel_MC(Emax)
 
             # Update
             for replica, result in zip(r, res):
@@ -222,7 +223,7 @@ class NestedSampling(object):
                 replica.niter = result.nsteps
             
         # Update stepsize
-        self.adjust_stepsize([res])
+        self.adjust_stepsize(res)
         
         # If verbose, print data
         if self.verbose:
@@ -280,8 +281,6 @@ class NestedSampling(object):
         Use existing replicas as starting configurations
         '''
         # choose a replica randomly
-        print(self.nreplicas)
-        print(len(self.replicas))
         assert len(self.replicas) == self.nreplicas
 
         # If serial
@@ -338,7 +337,7 @@ class NestedSampling(object):
 
         @return new Emax
         '''
-        return self.replicas[-self.nproc].energy
+        return self.replicas[-1].energy
 
 
     def one_iteration(self):
@@ -364,7 +363,7 @@ class NestedSampling(object):
             self.add_replica([rnew])
             
             # Sample compression from distribution
-            t = np.max(np.random.uniform(0,1, self.nreplicas))
+            #t = np.max(np.random.uniform(0,1, self.nreplicas))
 
             # COMPUTING EVIDENCE IN REAL TIME
             # Push volume to queue
@@ -386,6 +385,7 @@ class NestedSampling(object):
 
             # Run mc
             self.replicas, res = self.run_MC(r, Emax)
+            self.sort_replicas()
 
         # Update step
         self.iter_number += 1
@@ -424,14 +424,18 @@ class NestedSampling(object):
             self.one_iteration()
             i += 1
 
-            # Write out energy
-            if i % self.iprint == 0 or i == 1:
+            # Print out/save energy
+            if i % self.iprint == 0:
                 pos += self.get_positions()
                 self.write_out([i, self.Eold], self.enfile)
+                print(self.Eold)
 
             # Write to checkpoint
-            if i % self.cpfreq == 0:
+            if self.chkpt and i % self.cpfreq == 0:
                  self.write_out([i, self.get_positions()], self.cpfile)
+
+            #if self.verbose and i % self.iprint == 0:
+            print(self.get_positions())
 
         # Return
         return self.Z, self.w, self.L

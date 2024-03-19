@@ -47,11 +47,14 @@ class TestParallel(unittest.TestCase):
         # Initialize variables 
         self.pot = HarmonicPotential(2)
         self.r = [Replica(x, self.pot.get_energy(x)) for x in [np.random.uniform(low=-1, high=1, size=2) for _ in range(4)]]
-        self.Emax = 6
         self.mc = MCWalker(self.pot)
-        self.ns = NestedSampling(self.r, self.mc, nproc=2)
+        self.ns = NestedSampling(self.r, self.mc, iprint=1, nproc=2)
 
     def test_ns(self):
 
         # Test
-        self.ns.run_sampler(5)
+        self.ns.run_sampler(1)
+        for rep, new_rep in zip(self.r, self.ns.get_positions()):
+            
+            # Assert not equal
+            self.assertNotEqual(rep.x[0], new_rep[0])

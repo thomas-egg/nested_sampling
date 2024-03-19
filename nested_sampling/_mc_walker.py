@@ -134,47 +134,6 @@ class MCWalker(object):
         # Return
         return res
 
-class MCWalkerParallelWrapper(mp.Process):
-    """
-    Uses multiprocessing to run MC in a separate process
-    """
-    def __init__(self, conn, mc_runner):
-
-        # Initialize process and set connection and MC runner
-        mp.Process.__init__(self)
-        self.conn = conn
-        self.mc_runner = mc_runner
-
-    def do_MC(self, x0, stepsize, Emax, energy, seed):
-        '''
-        Function to run the MC simulation
-
-        @param x0 : positions
-        @param stepsize : size of step to take in simulation
-        @param Emax : max energy for acceptance
-        @param energy : energy
-        @param seed : random seed
-        '''
-        return self.mc_runner(x0, stepsize, Emax, energy, seed) 
-     
-    def run(self):
-        while 1:
-
-            # Check for kill message
-            message = self.conn.recv()
-            if message == "kill":
-                return
-
-            # If not, do MC if message is recieved
-            elif message[0] == "do mc":
-                x0, stepsize, Emax, energy, seed = message[1:]
-                res = self.do_MC(x0, stepsize, Emax, energy, seed)
-                self.conn.send(res)
-
-            # Anything else, throw error
-            else:
-                raise "error: unknown message: %s\n%s" % (self.name, message)
-
 class MCWalker_mcpele(_BaseMCRunner):
     '''
     MCWalker with mcpele
