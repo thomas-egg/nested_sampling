@@ -108,6 +108,7 @@ class NestedSampling(object):
         self.failed_mc_walks = 0
         self._mc_niter = 0 # total number of monte carlo iterations
         self.xqueue = [1] # queue for computing the weight associated with a given likelihood contour
+        self.Eold = 0
 
         # use mcpele or not
         self.use_mcpele = use_mcpele
@@ -115,13 +116,7 @@ class NestedSampling(object):
 
             # Set up sampler for MC
             self.step = sampler
-
-        # Evidence/Partition Function
-        self.Z = 0.0
-        self.Eold = 0
-        self.L = []
-        self.w = []
-        self.Zlist = []
+        
         
     ####################
     # Functions for MC #
@@ -362,24 +357,6 @@ class NestedSampling(object):
             # Finish off step
             self.add_replica([rnew])
             
-            # Sample compression from distribution
-            #t = np.max(np.random.uniform(0,1, self.nreplicas))
-
-            # COMPUTING EVIDENCE IN REAL TIME
-            # Push volume to queue
-            #self.xqueue.append(self.xqueue[-1] * t)
-
-            # Condition for adding to Z via trapezoid rule (need three entries in volume queue)
-            #if len(self.xqueue) == 3:
-
-                # Add to Z (trapezoid rule)
-            #    self.compound_Z(self.Eold)
-
-            #elif len(self.xqueue) > 3:
-
-                # Error
-            #    raise Exception('volume queue exceeds size of 3!')
-
         # Parallel
         else:
 
@@ -416,6 +393,11 @@ class NestedSampling(object):
         # Histogram
         pos = []
 
+        # Begin
+        print('############')
+        print('# NS BEGIN #')
+        print('############')
+
         # While termination condition not met
         i = 0
         while i < steps:
@@ -426,19 +408,20 @@ class NestedSampling(object):
 
             # Print out/save energy
             if i % self.iprint == 0:
-                pos += self.get_positions()
-                self.write_out([i, self.Eold], self.enfile)
                 print(self.Eold)
 
             # Write to checkpoint
             if self.chkpt and i % self.cpfreq == 0:
-                 self.write_out([i, self.get_positions()], self.cpfile)
+                self.write_out([i, self.get_positions()], self.cpfile)
+                self.write_out([i, self.Eold], self.enfile)
 
             #if self.verbose and i % self.iprint == 0:
             print(self.get_positions())
 
         # Return
-        return self.Z, self.w, self.L
+        print('##########')
+        print('# NS END #')
+        print('##########')
 
     ########
     # DATA #

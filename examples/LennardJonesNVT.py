@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # Instantiate potential
     # Assuming sigma = 1 and eps = 1
     pot = LJCut(eps, sigma, rcut=3.0*sigma, boxvec=box)
-    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=0, high=box[0], size=(nparticles, ndim)) for _ in range(npoints)]]
+    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=0, high=box[0], size=(nparticles, ndim)) for _ in range(nlive)]]
     mc = MCWalker_mcpele(pot)
     sampler = NestedSampling(replicas, mc, cpfreq=500, iprint=500, cpfile='chk.txt', use_mcpele=True, sampler=10)
     sampler.run_sampler(3.0*(10 ** 12))
