@@ -6,7 +6,7 @@ import sys
 import csv
 import multiprocessing as mp
 from joblib import Parallel, delayed
-from nested_sampling import MCWalker, MCWalker_mcpele
+from nested_sampling import MCWalker, MCWalker_mcpele, Result
 
 def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
     '''
@@ -22,10 +22,16 @@ def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
     '''
 
     # mcpele
-    if mcpele:
+    if use_mcpele:
 
+        res = Result()
         mc = MCWalker_mcpele(potential, r.x, temperature, stepsize, niter, Emax)
-        res = mc.run()
+        res.x, res.energy = mc.mc_run()
+        res.Emax = Emax
+        res.naccept = mc.get_accepted_fraction() * niter
+        res.nsteps = niter
+        print(mc.get_accepted_fraction())
+        print(stepsize)
 
     # python implementation otherwise
     else:
@@ -114,7 +120,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, pot, temp, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, chkpt=False, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
+    def __init__(self, replicas, pot, temp, stepsize=0.5, nproc=1, verbose=False, max_stepsize=5.0, iprint=100, chkpt=False, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
 
         # Initialize class variables
         self.nproc = nproc
@@ -134,8 +140,7 @@ class NestedSampling(object):
         self.store_all_energies = True        
         self.iter_number = 0
         self.failed_mc_walks = 0
-        self._mc_niter = 0 # total number of monte carlo iterations
-        self.xqueue = [1] # queue for computing the weight associated with a given likelihood contour
+        self._mc_niter = 100 # total number of monte carlo iterations
         self.Eold = 0
         self.pot = pot
         self.temperature = temp
@@ -173,7 +178,7 @@ class NestedSampling(object):
         seed = np.random.randint(0, 1000)
 
         # Run MC
-        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, self.Emax, self.use_mcpele)
+        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele)
 
         # Return
         return [res]
@@ -190,7 +195,7 @@ class NestedSampling(object):
         seed = np.random.randint(0, 1000)
 
         # Run MC
-        res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(mc_runner)(r, self.pot, self.temperature, self.stepsize, self._mc_niter, self.Emax, self.use_mcpele) for r in self.replicas)
+        res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(mc_runner)(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele) for r in self.replicas)
 
         # Return
         return res
@@ -227,6 +232,7 @@ class NestedSampling(object):
             
         # Update stepsize
         self.adjust_stepsize(res)
+        print(res)
         
         # If verbose, print data
         if self.verbose:
@@ -421,7 +427,7 @@ class NestedSampling(object):
             # Write to checkpoint
             if self.chkpt and i % self.cpfreq == 0:
                 self.write_out([i, self.get_positions()], self.cpfile)
-                self.write_out([i, self.Eold], self.enfile)
+            #    self.write_out([i, self.Eold], self.enfile)
 
             #if self.verbose and i % self.iprint == 0:
             print(self.get_positions())
@@ -461,6 +467,6 @@ class NestedSampling(object):
         '''
         print(data)
         # Open and write
-        with open(fi, "w", newline='') as file:
+        with open(fi, "a", newline='') as file:
             csvwriter = csv.writer(file)
             csvwriter.writerow(data)

@@ -16,6 +16,4 @@ cd /scratch/tje3676/RESEARCH/ML_LANDSCAPES/nested_sampling/examples
 singularity exec --nv \
 	    --overlay /scratch/tje3676/RESEARCH/research_container.ext3:ro \
 	    /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif\
-	    /bin/bash -c "source /ext3/env.sh; conda activate cb3-3.9; export PYTHONPATH=/scratch/tje3676/RESEARCH/pele/:/scratch/tje3676/RESEARCH/ML_LANDSCAPES/nested_sampling/:/scratch/tje3676/RESEARCH/mcpele/; python LennardJonesNVT.py -K 10 -N 5 -S 10 -P 5 -D 0.002 -sig 1.0 -eps 1.0 -dim 3"
-
-
+	    /bin/bash -c "source /ext3/env.sh; conda activate cb3-3.9; export PYTHONPATH=/scratch/tje3676/RESEARCH/pele/:/scratch/tje3676/RESEARCH/ML_LANDSCAPES/nested_sampling/:/scratch/tje3676/RESEARCH/mcpele/; python LennardJonesNVT.py -K 10 -N 5 -S 10 -P 5 -D 0.002 -sig 1.0 -eps 10.0 -dim 3"

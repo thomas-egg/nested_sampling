@@ -159,3 +159,16 @@ class MCWalker_mcpele(Metropolis_MCrunner):
 
         # Set temp
         self.temperature = temp
+
+    def mc_run(self):
+        '''
+        Function to run MC
+
+        @return res : result
+        '''
+
+        # Run and return
+        self.run()
+        coords = self.get_coords()
+        energy = self.get_energy()
+        return coords, energy
