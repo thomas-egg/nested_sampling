@@ -26,7 +26,9 @@ def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
 
         res = Result()
         mc = MCWalker_mcpele(potential, r.x, temperature, stepsize, niter, Emax)
-        res.x, res.energy = mc.mc_run()
+        mc.mc_run()
+        res.x = mc.get_coords()
+        res.energy = mc.get_energy()
         res.Emax = Emax
         res.naccept = mc.get_accepted_fraction() * niter
         res.nsteps = niter
