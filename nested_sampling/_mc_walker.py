@@ -4,7 +4,7 @@ import numpy as np
 from nested_sampling import Result
 
 # For MC with mcpele
-from mcpele.monte_carlo import _BaseMCRunner
+from mcpele.monte_carlo import Metropolis_MCrunner
 from mcpele.monte_carlo import SampleGaussian
 
 def random_displacement(x, stepsize):
@@ -134,7 +134,7 @@ class MCWalker(object):
         # Return
         return res
 
-class MCWalker_mcpele(_BaseMCRunner):
+class MCWalker_mcpele(Metropolis_MCrunner):
     '''
     MCWalker with mcpele
 

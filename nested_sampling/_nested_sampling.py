@@ -6,6 +6,35 @@ import sys
 import csv
 import multiprocessing as mp
 from joblib import Parallel, delayed
+from nested_sampling import MCWalker, MCWalker_mcpele
+
+def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
+    '''
+    Function to run MC with/without mcpele
+    @param r : replica
+    @param potential : potential energy function
+    @param temperature : temperature
+    @param stepsize : size of step
+    @param niter : number steps
+    @param Emax : maximum energy for MC
+    @param use_mcpele : bool for using mcpele or not
+    @return res : result
+    '''
+
+    # mcpele
+    if mcpele:
+
+        mc = MCWalker_mcpele(potential, r.x, temperature, stepsize, niter, Emax)
+        res = mc.run()
+
+    # python implementation otherwise
+    else:
+
+        mc = MCWalker(potential, mciter=niter)
+        res = mc(r.x, stepsize, Emax, r.energy)
+
+    # Return result
+    return res
 
 class Replica(object):
     '''
@@ -85,7 +114,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, mc_walker, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, chkpt=False, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
+    def __init__(self, replicas, pot, temp, stepsize=0.1, nproc=1, verbose=False, max_stepsize=0.5, iprint=100, chkpt=False, cpfile=None, cpfreq=1000, enfile=None, cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
 
         # Initialize class variables
         self.nproc = nproc
@@ -94,7 +123,6 @@ class NestedSampling(object):
         self.replicas = replicas
         self.nreplicas = len(self.replicas)
         self.sort_replicas()
-        self.mc_walker = mc_walker
         self.stepsize = stepsize
         self.max_stepsize = max_stepsize
         self.chkpt = chkpt
@@ -109,13 +137,19 @@ class NestedSampling(object):
         self._mc_niter = 0 # total number of monte carlo iterations
         self.xqueue = [1] # queue for computing the weight associated with a given likelihood contour
         self.Eold = 0
+        self.pot = pot
+        self.temperature = temp
 
         # use mcpele or not
         self.use_mcpele = use_mcpele
         if self.use_mcpele:
 
             # Set up sampler for MC
+            self.backend = 'threads'
             self.step = sampler
+
+        else:
+            self.backend = 'loky'
         
         
     ####################
@@ -138,18 +172,8 @@ class NestedSampling(object):
         rsave = r
         seed = np.random.randint(0, 1000)
 
-        # mcpele implementation
-        if self.use_mcpele:
-
-            # Run MC
-            self.mc.set_takestep(self.stepsize)
-            res = self.mc.run()
-
-        # Pure Python
-        else:
-
-            # Run walk
-            res = self.mc_walker(r.x, self.stepsize, Emax, r.energy, seed)
+        # Run MC
+        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, self.Emax, self.use_mcpele)
 
         # Return
         return [res]
@@ -165,18 +189,9 @@ class NestedSampling(object):
         # Random seed
         seed = np.random.randint(0, 1000)
 
-        # mcpele
-        if self.use_mcpele:
-            
-            # Run MC
-            self.mc.set_takestep(self.stepsize)
-            res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(self.mc.run()) for r in self.replicas)
+        # Run MC
+        res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(mc_runner)(r, self.pot, self.temperature, self.stepsize, self._mc_niter, self.Emax, self.use_mcpele) for r in self.replicas)
 
-        else:
-
-            # Run MC
-            res = Parallel(n_jobs=self.nproc)(delayed(self.mc_walker)(r.x, self.stepsize, Emax, r.energy, seed) for r in self.replicas)
-            
         # Return
         return res
 
@@ -196,26 +211,19 @@ class NestedSampling(object):
             # Save result
             res = self.serial_MC(r, Emax)
 
-            # Update replica
-            r = r[0]
-            r.x = res.x
-            r.energy = res.energy
-            r.niter += res.nsteps
-
-
         # Perform with parallelization
         else:
 
             # Save results
             res = self.parallel_MC(Emax)
 
-            # Update
-            for replica, result in zip(r, res):
+        # Update
+        for replica, result in zip(r, res):
 
-                # Save
-                replica.x = result.x
-                replica.energy = result.energy
-                replica.niter = result.nsteps
+            # Save
+            replica.x = result.x
+            replica.energy = result.energy
+            replica.niter = result.nsteps
             
         # Update stepsize
         self.adjust_stepsize(res)
@@ -418,7 +426,7 @@ class NestedSampling(object):
             #if self.verbose and i % self.iprint == 0:
             print(self.get_positions())
 
-        # Return
+        # Return/End
         print('##########')
         print('# NS END #')
         print('##########')
@@ -443,17 +451,6 @@ class NestedSampling(object):
 
         # Return
         return pos
-
-    def compound_Z(self, Eold):
-
-        # Add to Z (trapezoid rule)
-        w = .5 * (self.xqueue[0] - self.xqueue[2])
-        l = np.exp(-Eold)
-        self.Z += l * w
-        self.L.append(l)
-        self.Zlist.append(l*w)
-        self.w.append(self.xqueue[1])
-        self.xqueue.pop(0) 
 
     def write_out(self, data, fi):
         '''

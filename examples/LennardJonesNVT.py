@@ -1,7 +1,9 @@
 # Import libraries
+import numpy as np
 from pele.potentials import LJCut
 from nested_sampling import NestedSampling, MCWalker_mcpele, Replica
 import argparse
+import inspect
 
 ########
 # MAIN #
@@ -28,29 +30,32 @@ if __name__ == '__main__':
 
     # Argument parser
     parser = argparse.ArgumentParser(description='Nested Sampling on LJ-31')
-    parser.add_argument('nlive', metavar='K', type=float, help='Number of live particles')
-    parser.add_argument('nproc', metavar='N', type=int, help='Number of processors')
-    parser.add_argument('nsteps', metavar='S', type=int, help='Number of steps')
-    parser.add_argument('nparticles', metavar='P', type=int, help='Number of particles')
-    parser.add_argument('density', metavar='D', type=float, help='Target density') 
-    parser.add_argument('sigma', metavar='sig', type=float, help='LJ sigma')
-    parser.add_argument('eps', metavar='eps', type=float, help='LJ epsilon')  
-    parser.add_argument('ndim', metavar='dim', type=float, help='Dimensionality')   
+    parser.add_argument('-K', metavar='--nlive', type=int, help='Number of live points')
+    parser.add_argument('-N', metavar='--nproc', type=int, help='Number of processors')
+    parser.add_argument('-S', metavar='--nsteps', type=int, help='Number of steps')
+    parser.add_argument('-P', metavar='--nparticles', type=int, help='Number of particles')
+    parser.add_argument('-D', metavar='--density', type=float, help='Target density') 
+    parser.add_argument('-sig', metavar='--sigma', type=float, help='LJ sigma')
+    parser.add_argument('-eps', metavar='--eps', type=float, help='LJ epsilon')  
+    parser.add_argument('-dim', metavar='--ndim', type=int, help='Dimensionality')   
     args = parser.parse_args()
+    
+    if None in (args.K, args.N, args.P, args.D, args.sig, args.eps, args.dim):
+        parser.error("Please provide all required arguments.")
 
     # Variable init
-    nlive = args.nlive
-    nparticles = args.nparticles
-    density = args.density
-    sigma = args.sigma
+    nlive = args.K
+    nproc = args.N
+    nparticles = args.P
+    density = args.D
+    sigma = args.sig
     eps = args.eps
-    ndim = args.ndim
+    ndim = args.dim
     box = get_boxvec(density, nparticles, sigma)
 
     # Instantiate potential
     # Assuming sigma = 1 and eps = 1
-    pot = LJCut(eps, sigma, rcut=3.0*sigma, boxvec=box)
-    replicas = [Replica(x, pot.get_energy(x)) for x in [np.random.uniform(low=0, high=box[0], size=(nparticles, ndim)) for _ in range(nlive)]]
-    mc = MCWalker_mcpele(pot)
-    sampler = NestedSampling(replicas, mc, cpfreq=500, iprint=500, cpfile='chk.txt', use_mcpele=True, sampler=10)
-    sampler.run_sampler(3.0*(10 ** 12))
+    pot = LJCut(eps, sigma, rcut=3.0*sigma, boxl=box[0]*sigma)
+    replicas = [Replica(x, pot.getEnergy(x)) for x in [np.random.uniform(low=0, high=box[0], size=(nparticles, ndim)) for _ in range(nlive)]]
+    sampler = NestedSampling(replicas, pot, temp=1, nproc=nproc, cpfreq=1, iprint=1, chkpt=True, cpfile='chk.txt', use_mcpele=True, sampler=10)
+    sampler.run_sampler(10)
