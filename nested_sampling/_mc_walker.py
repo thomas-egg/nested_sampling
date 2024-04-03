@@ -103,7 +103,7 @@ class MCWalker(object):
             self.takestep(xnew, stepsize)
 
             # Get energy
-            e = self.potential.get_energy(xnew)
+            e = self.potential.getEnergy(xnew)
 
             # Acceptance criteria/configuration tests
             accept = e < Emax
