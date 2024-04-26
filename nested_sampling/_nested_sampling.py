@@ -6,9 +6,9 @@ import sys
 import csv
 import multiprocessing as mp
 from joblib import Parallel, delayed
-from nested_sampling import MCWalker, MCWalker_mcpele, Result
+from nested_sampling import MCWalker, MCWalker_mcpele, Result, random_displacement
 
-def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
+def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele, takestep):
     '''
     Function to run MC with/without mcpele
     @param r : replica
@@ -18,6 +18,7 @@ def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
     @param niter : number steps
     @param Emax : maximum energy for MC
     @param use_mcpele : bool for using mcpele or not
+    @param takestep : type of step to take
     @return res : result
     '''
 
@@ -25,23 +26,18 @@ def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele):
     if use_mcpele:
 
         res = Result()
-        mc = MCWalker_mcpele(potential, r.x, temperature, stepsize, niter, hEmax=Emax, hEmin=None)
-        mc.set_control(temperature)
+        mc = MCWalker_mcpele(potential, np.array(r.x), temperature, stepsize, niter, hEmax=Emax, hEmin=-100, radius=0)
         mc.run()
         res.x = mc.get_coords()
         res.energy = mc.get_energy()
         res.Emax = Emax
         res.naccept = mc.get_accepted_fraction() * niter
         res.nsteps = niter
-        print(mc.get_success())
-        print(mc.get_iterations_count())
-        print(mc.get_neval())
-        print(mc.get_stepsize())
 
     # python implementation otherwise
     else:
 
-        mc = MCWalker(potential, mciter=niter)
+        mc = MCWalker(potential, takestep=takestep, mciter=niter)
         res = mc(r.x, stepsize, Emax, r.energy)
 
     # Return result
@@ -63,10 +59,11 @@ class Replica(object):
         boolean for if this walker was spawned randomly
     '''
 
-    def __init__(self, x, energy, niter=0, from_random=True):
+    def __init__(self, x, energy, eps=0, niter=0, from_random=True):
 
         # Copy values
         self.x = x
+        self.eps = eps
         self.energy = energy
         self.niter = niter
         self.from_random = from_random
@@ -107,8 +104,6 @@ class NestedSampling(object):
         start calculation from checkpoint binary file
     dispatcher_URI: str
         address (URI) of dispatcher (required for distributed parallelisation)
-    serializer: str
-        choice of serializer
 
     Attributes
     ----------
@@ -125,7 +120,7 @@ class NestedSampling(object):
         in parallel
     '''
 
-    def __init__(self, replicas, pot, temp, stepsize=0.1, nproc=1, verbose=False, max_stepsize=1.0, iprint=1000, chkpt=True, cpfile='chk_5.txt', cpfreq=10000, enfile='en_5.txt', cpstart = False, dispatcher_URI=None, serializer='pickle', use_mcpele=False, sampler=None):
+    def __init__(self, replicas, pot, temp, stepsize=0.1, nproc=1, verbose=False, max_stepsize=1.0, iprint=1000, chkpt=True, cpfile=None, cpfreq=10000, enfile=None, use_mcpele=False, niter=100, takestep=random_displacement):
 
         # Initialize class variables
         self.nproc = nproc
@@ -133,19 +128,18 @@ class NestedSampling(object):
         self.iprint = iprint
         self.replicas = replicas
         self.nreplicas = len(self.replicas)
-        self.sort_replicas()
         self.stepsize = stepsize
+        self.sort_replicas()        
         self.max_stepsize = max_stepsize
+        self.takestep = takestep
         self.chkpt = chkpt
         self.cpfreq = cpfreq
         self.cpfile = cpfile
-        self.cpstart = cpstart
         self.enfile = enfile
         self.max_energies = []
         self.store_all_energies = True        
         self.iter_number = 0
-        self.failed_mc_walks = 0
-        self._mc_niter = 100 # total number of monte carlo iterations
+        self._mc_niter = niter # total number of monte carlo iterations
         self.Eold = 0
         self.pot = pot
         self.temperature = temp
@@ -156,7 +150,6 @@ class NestedSampling(object):
 
             # Set up sampler for MC
             self.backend = 'threads'
-            self.step = sampler
 
         else:
             self.backend = 'loky'
@@ -183,7 +176,7 @@ class NestedSampling(object):
         seed = np.random.randint(0, 1000)
 
         # Run MC
-        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele)
+        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele, self.takestep)
 
         # Return
         return [res]
@@ -200,7 +193,7 @@ class NestedSampling(object):
         seed = np.random.randint(0, 1000)
 
         # Run MC
-        res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(mc_runner)(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele) for r in self.replicas)
+        res = Parallel(n_jobs=self.nproc, prefer="threads")(delayed(mc_runner)(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.use_mcpele, self.takestep) for r in self.replicas)
 
         # Return
         return res
@@ -234,12 +227,7 @@ class NestedSampling(object):
             replica.x = result.x
             replica.energy = result.energy
             replica.niter = result.nsteps
-            
-            print(replica.x)
-
-        # Update stepsize
-        self.adjust_stepsize(res)
-        print(res)
+            replica.eps = np.random.uniform()
         
         # If verbose, print data
         if self.verbose:
@@ -250,6 +238,10 @@ class NestedSampling(object):
             print(f'Enew: {res.energy}')
             print(f'Eold: {rsave.energy}')
             print(f'stepsize: {self.stepsize}')
+
+
+        if isinstance(self.stepsize, float):
+            self.adjust_stepsize(res)
 
         # Return
         return r, res
@@ -268,7 +260,7 @@ class NestedSampling(object):
 
         # If we store energies
         if self.store_all_energies:
-            self.max_energies.append(r.energy)
+            self.max_energies.append([r.energy, r.eps])
 
     def add_replica(self, rlist):
         ''' 
@@ -279,9 +271,11 @@ class NestedSampling(object):
 
         # Append
         for r in rlist:
+            
+            # Add replica
             self.replicas.append(r)
 
-        # Sort
+        # Sorts
         self.sort_replicas()
 
     def sort_replicas(self):
@@ -290,7 +284,7 @@ class NestedSampling(object):
         '''
 
         # Sort
-        self.replicas.sort(key=lambda r : r.energy)
+        self.replicas.sort(key=lambda r : (r.energy, r.eps))
 
     def get_starting_configurations_from_replicas(self):
         '''
@@ -372,7 +366,6 @@ class NestedSampling(object):
             self.pop_replica()
 
             # Run MC for replica
- 
             rnew, res = self.run_MC(r, Emax)
 
             # Finish off step
@@ -393,9 +386,6 @@ class NestedSampling(object):
 
             # Throw error
             raise Exception('Size mismatch in number of replicas!')
-
-        # Save energy from this step
-        self.Eold = Emax
 
     #######
     # RUN #
@@ -424,30 +414,36 @@ class NestedSampling(object):
         while i < steps:
 
             # Run
-            self.one_iteration()
-            i += 1
+            if steps > 0:
+                i += 1
+            else:
+                if self.iter_number % self.cpfreq == 0:
+
+                    # Convergence test
+                    criteria = convergence_test(self.max_energies[:,0], self.max_energies[:,1], self.nreplicas, self.nproc, self.iter_number)
+
+                    # Break if converged
+                    if criteria: 
+                        break
+
             print(f'# ITERATION {i} #')
+
+            # Write to checkpoint
+            if self.chkpt and i % self.cpfreq == 0:
+                #self.write_out([i, self.get_positions()], self.cpfile)
+                self.write_out(self.max_energies, self.enfile)
 
             # Print out/save energy
             if i % self.iprint == 0:
                 print(self.Eold)
 
-            # Save energies
-            #self.max_energies.append([i, self.Eold])
-            
-            # Write to checkpoint
-            if self.chkpt and i % self.cpfreq == 0:
-                self.write_out([i, self.get_positions()], self.cpfile)
-                self.write_out(self.max_energies, self.enfile)
-
+            # ITERATE
+            self.one_iteration()
 
         # Return/End
         print('##########')
         print('# NS END #')
         print('##########')
-
-     
-    
 
     ########
     # DATA #
@@ -478,7 +474,9 @@ class NestedSampling(object):
         @param fi : file to write to
         '''
         print(data)
+        np.savetxt(fi, np.array(data), delimiter=',')
+
         # Open and write
-        with open(fi, "w", newline='') as file:
-            csvwriter = csv.writer(file, lineterminator='\n')
-            csvwriter.writerow(data)
+        #with open(fi, "w", newline='') as file:
+        #    csvwriter = csv.writer(file, lineterminator='\n')
+        #    csvwriter.writerow(data)
