@@ -1,6 +1,6 @@
 # Import libraries
 import numpy as np
-from pele.potentials import LJ
+from pele.potentials import LJCut
 from nested_sampling import NestedSampling, MCWalker_mcpele, Replica
 import argparse
 import inspect
@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     # Instantiate potential
     # Assuming sigma = 1 and eps = 1
-    pot = LJ(eps, sigma, boxvec=box)
+    pot = LJCut(eps, sigma, rcut=3*sigma, boxvec=box)
     replicas = [Replica(x, pot.getEnergy(x)) for x in [np.random.uniform(low=0, high=box[0], size=(nparticles*ndim)) for _ in range(nlive)]]
-    sampler = NestedSampling(replicas, pot, temp=1, nproc=nproc, cpfreq=1000, verbose=False, iprint=1000, chkpt=True, enfile='en_5_new.txt', cpfile='chk_5_new.txt', use_mcpele=False)
+    sampler = NestedSampling(replicas, pot, temp=1, nproc=nproc, cpfreq=1000, verbose=False, iprint=1000, chkpt=True, enfile='serial/en5.txt', cpfile='serial/chk5.txt', use_mcpele=True, takestep=None)
     sampler.run_sampler(steps)

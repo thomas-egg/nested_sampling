@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
-#SBATCH --time=5:00:00
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=10
+#SBATCH --time=20:00:00
 #SBATCH --mem=2GB
-#SBATCH --job-name=NS_LJ5_plot
+#SBATCH --job-name=NS_LJ_plot
 
 # Initialize
 module purge
