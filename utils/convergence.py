@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+from .utils import *
 
 def convergence_test(en_list, eps_list, K, nproc, iter_num, eps=10**-3):
     '''

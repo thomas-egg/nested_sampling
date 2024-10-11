@@ -1,8 +1,58 @@
-from utils import compute_Z
-from joblib import Parallel, delayed
 import numpy as np
-import csv
+from joblib import Parallel, delayed
 import sys
+
+def scale_energy(energy, eps, beta, n, X):
+    '''
+    Function to scale energy
+
+    @param energy : energy value
+    @param eps : random value to break degeneracy
+    @param beta : beta value
+    @param n : element index
+    @param K : number of live points
+    @return element of PF sum
+    '''
+
+    # Set scale
+    t = np.random.beta(n, 1, size=2)
+    x_minus = X / t[0]
+    x_plus = X * t[1]
+    w_n = 0.5 * (x_minus - x_plus)
+
+    # Return element of PF
+    element = w_n * (1 + (np.finfo(np.float32).eps * (eps - 0.5))) * np.exp(- beta * energy)
+    return element
+
+def compute_Z(en_list, eps_list, beta, K, nproc):
+    '''
+    Function to compute partition function
+
+    @param en_list : list of energies
+    @param beta : value of inverse T
+    @param K : number of live points
+    @param nproc : number of processors
+    @return Z : partition function
+    '''
+
+    # Serial
+    if nproc == 1:
+
+        # Iterate over energies
+        Z = 0
+        for n in range(len(en_list)):
+
+            # Add to Z
+            Z += scale_energy(en_list[n], eps_list[n], beta, n, K)
+
+    # Parallel
+    else:
+
+        # Compute Z
+        Z = sum(Parallel(n_jobs=nproc)(delayed(scale_energy)(en_list[n], eps_list[n], beta, n, K) for n in range(len(en_list))))
+
+    # Return
+    return Z
 
 def compute_expectation(energy, eps, beta, n, K):
     '''
