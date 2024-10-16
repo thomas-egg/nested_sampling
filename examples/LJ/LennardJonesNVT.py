@@ -1,9 +1,50 @@
 # Import libraries
 import numpy as np
-from pele.potentials import LJCut
+#from pele.potentials import LJCut
 from nested_sampling import NestedSampling, MCWalker_mcpele, Replica
 import argparse
 import inspect
+from numba import jit
+
+@jit(nopython=True)
+def apply_pbc(rij, box_length):
+    """Apply minimum image convention to account for periodic boundary conditions."""
+    return rij - box_length * np.round(rij / box_length)
+
+class LJCut(object):
+    def __init__(self, eps, sig, rcut, bv):
+        self.eps = eps
+        self.sig = sig
+        self.rcut = rcut
+        self.bv = bv
+
+    @jit(nopython=True)
+    def __call__(self, positions):
+        """Compute Lennard-Jones potential with cutoff and periodic boundary conditions (PBC)."""
+        energy = 0.0
+        n_atoms = len(positions)
+        cutoff_sq = self.rcut ** 2  # Square the cutoff for efficiency
+
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                # Distance vector between atoms i and j
+                rij = positions[i] - positions[j]
+                # Apply periodic boundary conditions
+                rij = apply_pbc(rij, self.bv[0])
+                # Squared distance
+                r_sq = np.dot(rij, rij)
+    
+                # Only compute if within cutoff distance
+                if r_sq < cutoff_sq:
+                    # Compute r^2 to r^6 and r^12
+                    r2_inv = self.sig ** 2 / r_sq
+                    r6_inv = r2_inv ** 3
+                    r12_inv = r6_inv ** 2
+                    # Lennard-Jones potential
+                    energy += 4 * self.eps * (r12_inv - r6_inv)
+
+        return energy
+
 
 ########
 # MAIN #
