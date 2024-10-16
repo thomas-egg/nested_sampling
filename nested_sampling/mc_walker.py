@@ -4,8 +4,8 @@ import numpy as np
 from nested_sampling import Result
 
 # For MC with mcpele
-from mcpele.monte_carlo import Metropolis_MCrunner
-from mcpele.monte_carlo import SampleGaussian
+#from mcpele.monte_carlo import Metropolis_MCrunner
+#from mcpele.monte_carlo import SampleGaussian
 
 def random_displacement(x, stepsize):
     '''
@@ -148,28 +148,28 @@ class MCWalker(object):
         # Return
         return res
 
-class MCWalker_mcpele(Metropolis_MCrunner):
-    '''
-    MCWalker with mcpele
-
-    Parameters
-    ----------
-    potential : pele potential
-        potential energy function to evaluate at steps
-    x : array
-        coordinates of the walker (supply initial, these get updated)
-    temperature : float
-        temperature to conduct sampling at, if athermal use 1
-    nsteps : int
-        number of steps to take
-    '''
-
-    def set_control(self, temp):
-        '''
-        Function to set temperature of system
-
-        @param temp : temperature to set
-        '''
-
-        # Set temp
-        self.temperature = temp
+#class MCWalker_mcpele(Metropolis_MCrunner):
+#    '''
+#    MCWalker with mcpele
+#
+#    Parameters
+#    ----------
+#    potential : pele potential
+#        potential energy function to evaluate at steps
+#    x : array
+#        coordinates of the walker (supply initial, these get updated)
+#    temperature : float
+#        temperature to conduct sampling at, if athermal use 1
+#    nsteps : int
+#        number of steps to take
+#    '''
+#
+#    def set_control(self, temp):
+#        '''
+#        Function to set temperature of system
+#
+#        @param temp : temperature to set
+#        '''
+#
+#        # Set temp
+#        self.temperature = temp
