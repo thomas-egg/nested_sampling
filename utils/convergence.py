@@ -2,7 +2,7 @@ import numpy as np
 import sys
 from .utils import *
 
-def convergence_test(en_list, eps_list, K, nproc, iter_num, eps=10**-3):
+def convergence_test(en_list, K, eps=10**-3):
     '''
     Function to test for algorithm convergence
 
@@ -16,8 +16,10 @@ def convergence_test(en_list, eps_list, K, nproc, iter_num, eps=10**-3):
     '''
 
     # Get Z
-    Z = compute_Z(en_list, 1, K, nproc)
-    Z_live = ((K/(K+1)) ** iter_num) * max(en_list)
+    Z = compute_Z(en_list, 1, K)
+    Z_prev = compute_Z(en_list, 1, K)
+    dZ = np.abs(Z_prev - Z)
+    
 
     # Return convergence
-    return Z_live/Z < eps
+    return (dZ / Z) < eps

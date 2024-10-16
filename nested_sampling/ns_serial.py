@@ -13,7 +13,7 @@ from nested_sampling import MCWalker, MCWalker_mcpele, Result, random_displaceme
 from utils import convergence_test
 import hickle as hkl
 
-def mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele, takestep):
+def _mc_runner(r, potential, temperature, stepsize, niter, Emax, use_mcpele, takestep):
     '''
     Function to run MC with/without mcpele
     @param r : replica
@@ -172,12 +172,12 @@ class NestedSampling(object):
         r = r[0]
 
         # Run MC
-        res = mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.takestep)
+        res = _mc_runner(r, self.pot, self.temperature, self.stepsize, self._mc_niter, Emax, self.takestep)
 
         # Return
         return [res]
 
-    def run_MC(self, Emax, r):
+    def _run_MC(self, Emax, r):
         '''
         Function to run MC.
 
@@ -211,7 +211,7 @@ class NestedSampling(object):
             print(f'stepsize: {self.stepsize}')
 
         if isinstance(self.stepsize, float):
-            self.adjust_stepsize(res)
+            self._adjust_stepsize(res)
 
         # Return
         return r, res
@@ -220,7 +220,7 @@ class NestedSampling(object):
     # Nested Sampling Updates #
     ###########################
 
-    def pop_replica(self):
+    def _pop_replica(self):
         '''
         Function to remove replica with highest energy (lowest likeliehood)
         '''
@@ -228,7 +228,7 @@ class NestedSampling(object):
         # Pop!
         self.replicas.pop()
 
-    def add_replica(self, rlist):
+    def _add_replica(self, rlist):
         ''' 
         Function to add replica
 
@@ -242,9 +242,9 @@ class NestedSampling(object):
             self.replicas.append(r)
 
         # Sorts
-        self.sort_replicas()
+        self._sort_replicas()
 
-    def get_starting_configurations_from_replicas(self):
+    def _get_starting_configurations_from_replicas(self):
         '''
         Use existing replicas as starting configurations
         '''
@@ -259,7 +259,7 @@ class NestedSampling(object):
         rlist = [r.copy() for r in rlist]
         return rlist
 
-    def adjust_stepsize(self, res):
+    def _adjust_stepsize(self, res):
         '''
         If acceptance ratio is drifting low we can adjust the stepsize
         so that we continue efficient sampling
@@ -293,7 +293,7 @@ class NestedSampling(object):
             # Set to max
             self.stepsize = self.max_stepsize
 
-    def sort_replicas(self):
+    def _sort_replicas(self):
         '''
         Sort replicas in decreasing energy order
         '''
@@ -305,32 +305,32 @@ class NestedSampling(object):
         if self.store_all_energies:
             self.max_energies.append([self.replicas[-1].energy, self.replicas[-1].eps])
 
-    def get_new_Emax(self):
+    def _get_new_Emax(self):
         '''
         Function to return new Emax
 
         @return new Emax
         '''
-        self.sort_replicas()
+        self._sort_replicas()
         return self.replicas[-1].energy
 
 
-    def one_iteration(self):
+    def _one_iteration(self):
         '''
         Function to run one iteration of the NS algorithm
         '''
         # New Emax
-        Emax = self.get_new_Emax()
+        Emax = self._get_new_Emax()
 
         # Pop
-        r = self.get_starting_configurations_from_replicas()
-        self.pop_replica()
+        r = self._get_starting_configurations_from_replicas()
+        self.__pop_replica()
 
         # Run MC for replica
-        rnew, res = self.run_MC(Emax, r)
+        rnew, res = self._run_MC(Emax, r)
 
         # Finish off step
-        self.add_replica(rnew)
+        self._add_replica(rnew)
 
         # Test to make sure sizes match
         if self.nreplicas != len(self.replicas):
@@ -362,7 +362,7 @@ class NestedSampling(object):
         while i <= steps:
 
             # ITERATE
-            self.one_iteration()
+            self._one_iteration()
             self.iter_number += 1
 
             # Run
@@ -383,7 +383,7 @@ class NestedSampling(object):
 
             # Write to checkpoint
             if self.chkpt and self.iter_number % self.cpfreq == 0:
-                #self.write_out(self.get_positions(), self.cpfile)
+                self.write_out(self.get_positions(), self.cpfile)
                 self.write_out(self.max_energies, self.enfile)
 
         # Return/End
@@ -420,4 +420,3 @@ class NestedSampling(object):
         @param fi : file to write to
         '''
         hkl.dump(fi, data)
-
