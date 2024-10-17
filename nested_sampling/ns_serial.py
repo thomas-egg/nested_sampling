@@ -68,7 +68,6 @@ class Replica(object):
 
         # Copy values
         self.x = x
-        self.eps = eps
         self.energy = energy
         self.niter = niter
         self.from_random = from_random
@@ -198,7 +197,6 @@ class NestedSampling(object):
             replica.x = result.x
             replica.energy = result.energy
             replica.niter = result.nsteps
-            replica.eps = np.random.uniform()
         
         # If verbose, print data
         if self.verbose:
@@ -299,11 +297,11 @@ class NestedSampling(object):
         '''
 
         # Sort
-        self.replicas.sort(key=lambda r : (r.energy, r.eps))
+        self.replicas.sort(key=lambda r : (r.energy))
 
         # If we store energies
         if self.store_all_energies:
-            self.max_energies.append([self.replicas[-1].energy, self.replicas[-1].eps])
+            self.max_energies.append(self.replicas[-1].energy)
 
     def _get_new_Emax(self):
         '''
