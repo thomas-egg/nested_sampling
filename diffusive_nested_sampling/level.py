@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 class Level(object):
     '''
@@ -6,7 +7,7 @@ class Level(object):
     some fixed number of levels and the particle will traverse
     and sample them.
     '''
-    def __init__(self, index, likelihood_boundary, init_X):
+    def __init__(self, index, likelihood_boundary):
         '''
         Initialize a DNS level
 
@@ -16,7 +17,7 @@ class Level(object):
         '''
         self.index = index 
         self.bound = likelihood_boundary
-        self.X = init_X
+        self.X = np.exp(-self.index)
 
     @property
     def likelihood_bound(self):
@@ -25,7 +26,6 @@ class Level(object):
         '''
         return self.bound
 
-    @property
     def level_weight(self, j:float, l:float):
         '''
         Exponentially decaying weight for this level
@@ -33,17 +33,17 @@ class Level(object):
         @param j : current max level
         @param l : Lambda value for controlling backtracking
         '''
-        weight = torch.exp((self.index - j) / l)
+        weight = np.exp((self.index - j) / l)
         return weight
 
     @property
-    def X(self):
+    def get_X(self):
         '''
         Return phase space volume element
         '''
         return self.X
 
-    def set_X(self, preceeding_X, history, C=1000):
+    def set_X(self, preceeding_X, l_history, p_history, C=1000):
         '''
         Compute phase space volume element of level given the history of 
         particle
@@ -52,7 +52,7 @@ class Level(object):
         @param history : level/likelihood history of particles
         @param C : confidence
         '''
-        inds = torch.where(history['j'] == self.index - 1)
-        numerator = torch.sum(history['L'][inds] > self.bound) + (C * torch.exp(-1))
-        denominator = torch.sum(history['j'] == self.index) + C
+        inds = p_history['j'] == self.index - 1
+        numerator = torch.sum(l_history[inds] > self.bound) + (C * np.exp(-1))
+        denominator = (torch.tensor(p_history['j']) == self.index).sum().item() + C
         self.X = preceeding_X * (numerator / denominator)

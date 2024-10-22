@@ -1,5 +1,5 @@
 import torch
-from level import Level
+from diffusive_nested_sampling.level import Level
 from typing import Callable
 
 class Particle(object):
@@ -16,10 +16,10 @@ class Particle(object):
         '''
         
         self.x = init_pos
-        self.j = init_index
+        self.ind = init_index
         self.history = {
-            'x' : self.x,
-            'j' : self.j
+            'x' : [self.x],
+            'j' : [self.ind]
         }                     
 
     @property
@@ -27,7 +27,7 @@ class Particle(object):
         '''
         Return level index
         '''
-        return self.j
+        return self.ind
 
     @property
     def pos(self):
@@ -35,6 +35,13 @@ class Particle(object):
         Get patrticle position
         '''
         return self.x
+
+    @property
+    def get_history(self):
+        '''
+        Return full history of particle
+        '''
+        return self.history
     
     def assign_state(self, new_pos:float, new_index:int):
         '''
@@ -43,4 +50,6 @@ class Particle(object):
         @param new_index : index to jump to
         '''
         self.x = new_pos
-        self.j = new_index
+        self.ind = new_index
+        self.history['x'].append(new_pos)
+        self.history['j'].append(new_index)

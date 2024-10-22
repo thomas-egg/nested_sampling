@@ -1,8 +1,8 @@
 import torch
-from particle import Particle
-from level import Level
+from diffusive_nested_sampling.particle import Particle
+from diffusive_nested_sampling.level import Level
 
-def prob(self, X:float, likelihood:float, J:int, l:float):
+def prob(level, likelihood:float, J:int, l:float):
         '''
         Return joint distribution of particle position and level
 
@@ -11,20 +11,19 @@ def prob(self, X:float, likelihood:float, J:int, l:float):
         @param J : Current max level
         @param l : Lambda value
         '''
-        if likelihood < self.level().likelihood_bound():
+        if likelihood < level.likelihood_bound:
             return 0
         else:
-            return self.level().level_weight(J, l) / X
+            return level.level_weight(j=J, l=l) / level.X
 
 class MCMC(object):
-    def __init__(self, beta, C, likelihood_function, acc_rate=0.8):
+    def __init__(self, beta, likelihood_function, acc_rate=0.8):
         '''
         Simple Monte Carlo implementation
 
         @param beta : exponent
         @param C : confidence
         '''
-        self.C = C
         self.beta = beta
         self.acc_rate = acc_rate
         self.likelihood_function = likelihood_function
@@ -40,18 +39,22 @@ class MCMC(object):
         '''
         
         # Set up proposal
-        j, x = particle.j(), particle.pos()
+        j, x = particle.j, particle.pos
         level = levels[j]
         x_new = x + torch.rand_like(x)
-        j_new = j + (2 * torch.randint(0, 2, (1,))) - 1
+        if J > 1:
+            j_new = j + (2 * torch.randint(0, 2, (1,))) - 1
+        else:
+            j_new = j
         new_level = levels[j_new]
 
         # Acceptance
-        p_x_prime = prob(level.X, self.likelihood_function(x_new), J, l)
-        p_x = prob(new_level.X, self.likelihood(x), J, l)
+        p_x_prime = prob(new_level, self.likelihood_function(x_new), J, l)
+        p_x = prob(level, self.likelihood_function(x), J, l)
         a = p_x_prime / p_x
-        r = torch.min(1, a)
-        if torch.rand() < r:
+        r = min(1, a)
+        u = torch.rand(size=(1,))
+        if u < r or u > self.acc_rate:
             return x_new, j_new
         else:
             return x, j
