@@ -25,16 +25,16 @@ class DiffusiveNestedSampler(object):
         '''
         self.likelihood_func = likelihood_func
         self.n = n_particles
-        self.levels = [Level(index=0, likelihood_boundary=torch.finfo(torch.float32).min)]
+        self.levels = [Level(index=0, likelihood_boundary=0)]
         self.max_level = max_level
         self.sampler = sampler
 
         # Initialize particles
-        pos = torch.rand(dim)
+        pos = torch.zeros(dim)
         self.p = Particle(pos, 0)
         self.likelihoods = [self.likelihood_func(pos)]
 
-    def __call__(self, iter_per_level=10, L=10, C=1000):
+    def __call__(self, iter_per_level=1000, L=10, C=1000):
         '''
         Call DNS
 
@@ -58,6 +58,8 @@ class DiffusiveNestedSampler(object):
             
             # Add new level
             boundary = torch.quantile(self.likelihoods, q=(1 - np.exp(-1)))
+            print(boundary)
+            self.likelihoods = self.likelihoods[self.likelihoods > boundary]
             self.levels.append(Level(index=J, likelihood_boundary=boundary))
             J += 1
             print(f'Added LEVEL {J}')
