@@ -5,8 +5,6 @@ import os
 
 # Add the directory containing diffusive_nested_sampling to sys.path
 sys.path.append(os.path.abspath( "../.."))
-for path in sys.path:
-    print(path)
 
 # Now import the modules
 from diffusive_nested_sampling.dns import DiffusiveNestedSampler
@@ -29,12 +27,13 @@ def likelihood(x:torch.tensor):
     # Slab
     t2 = torch.sum(-0.5 * ((x - 0.031) / u) ** 2) - x.size(0) * torch.log(u * torch.sqrt(torch.tensor(2) * torch.pi))
     
-    return t1 + (100 * t2)
+    return torch.exp(t1) + (100 * torch.exp(t2))
 
 # Instantiate sampler
-sampler = MCMC(beta=0, likelihood_function=likelihood)
-dns = DiffusiveNestedSampler(likelihood, n_particles=1, dim=20, max_level=100, sampler=sampler)
+def main():
+    sampler = MCMC(beta=0, likelihood_function=likelihood)
+    dns = DiffusiveNestedSampler(likelihood, n_particles=1, dim=20, max_level=100, sampler=sampler)
 
-# Run sampler
-likelihoods = dns()
-print(likelihoods)
+    # Run sampler
+    likelihoods, p = dns(10000)
+    return likelihoods, p

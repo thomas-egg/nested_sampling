@@ -34,7 +34,7 @@ class DiffusiveNestedSampler(object):
         self.p = Particle(pos, 0)
         self.likelihoods = [self.likelihood_func(pos)]
 
-    def __call__(self, iter_per_level=1000, L=10, C=1000):
+    def __call__(self, nsteps, iter_per_level=50, L=10, C=1000):
         '''
         Call DNS
 
@@ -42,30 +42,30 @@ class DiffusiveNestedSampler(object):
         @param L : lambda value
         '''
         J = 1
-        while J < self.max_level:
-            for i in range(iter_per_level):
+        for i in range(nsteps):
 
-                # Run MC here
-                x, j = self.sampler(self.p, self.levels, J, L)
-                self.p.assign_state(x, j)
-                self.likelihoods.append(self.likelihood_func(x))
-
-            # Adjust level weights
-            self.likelihoods = torch.tensor(self.likelihoods)
-            print(self.likelihoods)
-            for i in range(J):
-                self.levels[i].set_X(self.levels[i-1].get_X, self.likelihoods, self.p.history)
+            # Run MC here
+            x, j = self.sampler(self.p, self.levels, J, L)
+            self.p.assign_state(x, j)
+            self.likelihoods.append(self.likelihood_func(x))
             
-            # Add new level
-            boundary = torch.quantile(self.likelihoods, q=(1 - np.exp(-1)))
-            print(boundary)
-            self.likelihoods = self.likelihoods[self.likelihoods > boundary]
-            self.levels.append(Level(index=J, likelihood_boundary=boundary))
-            J += 1
-            print(f'Added LEVEL {J}')
+            if i % iter_per_level == 0:
 
-            # Remove likelihoods lower than new boundary
-            self.likelihoods = self.likelihoods[self.likelihoods > boundary].tolist()
+                # Adjust level weights
+                self.likelihoods = torch.tensor(self.likelihoods)
+                for i in range(J):
+                    self.levels[i].set_X(self.levels[i-1].get_X, self.likelihoods, self.p.history)
+
+                if J < self.max_level:
+
+                    # Add level
+                    boundary = torch.quantile(self.likelihoods, q=(1 - np.exp(-1)))
+                    self.likelihoods = self.likelihoods[self.likelihoods > boundary]
+                    self.levels.append(Level(index=J, likelihood_boundary=boundary))
+                    J += 1
+
+                # Remove likelihoods lower than new boundary
+                self.likelihoods = self.likelihoods[self.likelihoods > boundary].tolist()
 
         # Return likelihoods afterwards
-        return torch.tensor(self.likelihoods)
+        return torch.tensor(self.likelihoods), self.p

@@ -13,7 +13,7 @@ def prob(level, J:int, l:float):
         return level.level_weight(j=J, l=l) / level.X
 
 class MCMC(object):
-    def __init__(self, beta, likelihood_function, acc_rate=0.8):
+    def __init__(self, beta, likelihood_function, acc_rate=0.5):
         '''
         Simple Monte Carlo implementation
 
