@@ -2,6 +2,11 @@ import torch
 from diffusive_nested_sampling.particle import Particle
 from diffusive_nested_sampling.level import Level
 
+'''
+Test MCMC shamelessly stolen from original Diffusive
+Nested Sampling Paper: https://arxiv.org/pdf/0912.2380. 
+'''
+
 def prob(level, J:int, l:float):
         '''
         Return joint distribution of particle position and level
@@ -13,7 +18,7 @@ def prob(level, J:int, l:float):
         return level.level_weight(j=J, l=l) / level.X
 
 class MCMC(object):
-    def __init__(self, beta, likelihood_function, acc_rate=0.5):
+    def __init__(self, beta, likelihood_function, max_J, acc_rate=0.5):
         '''
         Simple Monte Carlo implementation
 
@@ -23,6 +28,7 @@ class MCMC(object):
         self.beta = beta
         self.acc_rate = acc_rate
         self.likelihood_function = likelihood_function
+        self.max_J = max_J
 
     def __call__(self, particle:Particle, levels, J, l):
         '''
@@ -34,13 +40,16 @@ class MCMC(object):
         @param l : lambda
         '''
         
-        # Set up proposal
+        # Set up proposal - Jeffreys Prior
+        S = (1e-6 - 1) * torch.rand() + 1
+        S_prime = (1 - 100) * torch.rand() + 100
+
         # Position
         j, x = particle.j, particle.pos
         level = levels[j]
         i = torch.randint(size=(1,), low=0, high=x.shape[-1]).item()
         step = torch.zeros(x.shape)
-        step[i] = torch.rand(size=(1,)).item() - 0.5
+        step[i] = 1 / S
         x_new = x + step
         if self.likelihood_function(x_new) > levels[j].likelihood_bound:
             x = x_new
@@ -49,7 +58,7 @@ class MCMC(object):
 
         # Index
         if J > 1:
-            j_new = (j + (2 * torch.randint(0, 2, (1,))) - 1).clamp(min=0, max=J-1)
+            j_new = torch.round(torch.normal(mean=j, std=S_prime)).clamp(min=0, max=J)
         else:
             j_new = j
         new_level = levels[j_new]
@@ -61,6 +70,8 @@ class MCMC(object):
         r = min(1, a)
         u = torch.rand(size=(1,))
         if u < r or u > self.acc_rate:
+            j = j_new
+        elif u < 0.5 and J == self.max_J:
             j = j_new
         else:
             j = j
