@@ -31,7 +31,7 @@ def likelihood(x:torch.tensor):
 
 # Instantiate sampler
 def main():
-    sampler = MCMC(beta=0, likelihood_function=likelihood)
+    sampler = MCMC(beta=0, likelihood_function=likelihood, max_J=100)
     dns = DiffusiveNestedSampler(likelihood, n_particles=1, dim=20, max_level=100, sampler=sampler)
 
     # Run sampler

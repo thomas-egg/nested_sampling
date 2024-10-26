@@ -18,7 +18,7 @@ def prob(level, J:int, l:float):
         return level.level_weight(j=J, l=l) / level.X
 
 class MCMC(object):
-    def __init__(self, beta, likelihood_function, max_J, acc_rate=0.5):
+    def __init__(self, beta, likelihood_function, max_J, acc_rate=0.8):
         '''
         Simple Monte Carlo implementation
 
@@ -41,8 +41,8 @@ class MCMC(object):
         '''
         
         # Set up proposal - Jeffreys Prior
-        S = (1e-6 - 1) * torch.rand() + 1
-        S_prime = (1 - 100) * torch.rand() + 100
+        S = (1e-6 - 1) * torch.rand(size=(1,)) + 1
+        S_prime = (1 - 10) * torch.rand(size=(1,)) + 10
 
         # Position
         j, x = particle.j, particle.pos
@@ -58,7 +58,7 @@ class MCMC(object):
 
         # Index
         if J > 1:
-            j_new = torch.round(torch.normal(mean=j, std=S_prime)).clamp(min=0, max=J)
+            j_new = torch.round(torch.normal(mean=float(j), std=S_prime)).clamp(min=0, max=J-1).long()
         else:
             j_new = j
         new_level = levels[j_new]
