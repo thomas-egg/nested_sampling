@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 
 class Level(object):
@@ -7,7 +6,7 @@ class Level(object):
     some fixed number of levels and the particle will traverse
     and sample them.
     '''
-    def __init__(self, index, likelihood_boundary):
+    def __init__(self, index, likelihood_boundary, prev_X = None):
         '''
         Initialize a DNS level
 
@@ -17,7 +16,10 @@ class Level(object):
         '''
         self.index = index 
         self.bound = likelihood_boundary
-        self.X = np.exp(-self.index)
+        if prev_X is not None:
+            self.X = prev_X * np.exp(-1)
+        else:
+            self.X = 1
 
     @property
     def likelihood_bound(self):
@@ -26,14 +28,17 @@ class Level(object):
         '''
         return self.bound
 
-    def level_weight(self, j:float, l:float):
+    def level_weight(self, j:float, l:float, max_level:int):
         '''
         Exponentially decaying weight for this level
 
         @param j : current max level
         @param l : Lambda value for controlling backtracking
         '''
-        weight = np.exp((self.index - j) / l)
+        if j < max_level:
+            weight = np.exp((self.index - j + 1) / l)
+        else:
+            weight = 1.0
         return weight
 
     @property
@@ -43,7 +48,7 @@ class Level(object):
         '''
         return self.X
 
-    def set_X(self, preceeding_X, l_history, p_history, C=1000):
+    def set_X(self, preceeding_X, chain, counter, C=1000):
         '''
         Compute phase space volume element of level given the history of 
         particle
@@ -52,7 +57,9 @@ class Level(object):
         @param history : level/likelihood history of particles
         @param C : confidence
         '''
-        inds = p_history['j'] == self.index - 1
-        numerator = torch.sum(l_history[inds] > self.bound) + (C * np.exp(-1))
-        denominator = (torch.tensor(p_history['j']) == self.index).sum().item() + C
+        js = np.array(chain['j'])
+        ls = np.array(chain['L'])
+        inds = js == self.index - 1
+        numerator = np.sum(ls[inds] > self.bound) + (C * np.exp(-1))
+        denominator = counter[self.index - 1].item() + C
         self.X = preceeding_X * (numerator / denominator)

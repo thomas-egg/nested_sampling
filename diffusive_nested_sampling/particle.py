@@ -1,4 +1,3 @@
-import torch
 from diffusive_nested_sampling.level import Level
 from typing import Callable
 
@@ -7,7 +6,7 @@ class Particle(object):
     Particle for DNS run. Each particle will explore
     the different likelihood levels of the system
     '''
-    def __init__(self, init_pos:torch.tensor, init_index:torch.tensor):
+    def __init__(self, init_pos, init_index):
         '''
         Initialize particle
 
@@ -16,11 +15,7 @@ class Particle(object):
         '''
         
         self.x = init_pos
-        self.ind = init_index
-        self.history = {
-            'x' : [self.x],
-            'j' : [self.ind]
-        }                     
+        self.ind = init_index        
 
     @property
     def j(self):
@@ -35,13 +30,6 @@ class Particle(object):
         Get patrticle position
         '''
         return self.x
-
-    @property
-    def get_history(self):
-        '''
-        Return full history of particle
-        '''
-        return self.history
     
     def assign_state(self, new_pos:float, new_index:int):
         '''
@@ -51,5 +39,3 @@ class Particle(object):
         '''
         self.x = new_pos
         self.ind = new_index
-        self.history['x'].append(new_pos)
-        self.history['j'].append(new_index)

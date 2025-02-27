@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from diffusive_nested_sampling.level import Level
 from diffusive_nested_sampling.particle import Particle
+from multiprocessing import Pool, set_start_method
+from tqdm import tqdm
 
 '''
 Diffusive Nested Sampling Code
@@ -12,8 +14,9 @@ should result in a significant speedup of the sampling of
 the normalizing constant (partition function)
 '''
 
+set_start_method('spawn', force=True)
 class DiffusiveNestedSampler(object):
-    def __init__(self, likelihood_func, n_particles, dim, max_level, sampler):
+    def __init__(self, likelihood_func, n_particles, dim, max_level, sampler, device='cpu'):
         '''
         Initialize sampler
 
@@ -25,47 +28,72 @@ class DiffusiveNestedSampler(object):
         '''
         self.likelihood_func = likelihood_func
         self.n = n_particles
-        self.levels = [Level(index=0, likelihood_boundary=0)]
+        self.levels = [Level(0, 0.0, prev_X=None)]
         self.max_level = max_level
         self.sampler = sampler
+        self.sampler.iters = int(self.sampler.iters / self.n)
+        self.device = device
 
         # Initialize particles
-        pos = torch.zeros(dim)
-        self.p = Particle(pos, 0)
-        self.likelihoods = [self.likelihood_func(pos)]
+        pos = np.random.uniform(low=0.0, high=1.0, size=dim)
+        self.p = [Particle(pos, 0) for _ in range(n_particles)]
+        self.chain = {
+            'x' : [p.pos for p in self.p],
+            'j' : [p.j for p in self.p],
+            'L' : [self.likelihood_func(particle.pos) for particle in self.p]
+        }
+        self.counter = np.zeros(self.max_level)
 
-    def __call__(self, nsteps, iter_per_level=50, L=10, C=1000):
+    def run_mcmc(self, particle, levels, J, L):
+        '''
+        Run MCMC for particle
+
+        @param particle : particle to run MCMC for
+        @param levels : levels
+        @param J : number of levels
+        @param L : lambda value
+        '''
+        x, j, l = self.sampler(particle, levels, J, L)
+        return x, j, l
+
+    def __call__(self, nsteps, L=10, C=1000):
         '''
         Call DNS
 
         @param iter_per_level : likelihood evaluations per level created
         @param L : lambda value
         '''
-        J = 1
-        for i in range(nsteps):
+        J = 0
+        for i in tqdm(range(int(nsteps / (self.n * self.sampler.iters)))):
+
+            if J < (self.max_level - 1):
+
+                # Add level
+                likelihoods = torch.tensor(self.chain['L']).to(self.device)
+                boundary = torch.quantile(likelihoods, q=(1 - np.exp(-1))).item()
+                self.levels.append(Level(index=J, likelihood_boundary=boundary, prev_X=self.levels[J].get_X))
+                J += 1
+
+                # Remove points lower than new boundary
+                inds = likelihoods > boundary
+                inds = inds.cpu().numpy()
+                self.chain['x'] = np.array(self.chain['x'])[inds].tolist()
+                self.chain['j'] = np.array(self.chain['j'])[inds].tolist()
+                self.chain['L'] = np.array(self.chain['L'])[inds].tolist()
 
             # Run MC here
-            x, j = self.sampler(self.p, self.levels, J, L)
-            self.p.assign_state(x, j)
-            self.likelihoods.append(self.likelihood_func(x))
-            
-            if i % iter_per_level == 0:
+            with Pool(self.n) as pool:
+                results = pool.starmap(self.run_mcmc, [(p, self.levels, J, L) for p in self.p])
+                new_x, new_j, new_L = zip(*results)
+                for j in range(len(self.p)):
+                    self.chain['x'].extend(new_x[j])
+                    self.chain['j'].extend(new_j[j])
+                    self.chain['L'].extend(new_L[j])
+                    filtered_new_j = new_j[j][new_j[j] < J]
+                    self.counter += np.bincount(filtered_new_j, minlength=len(self.counter))
 
-                # Adjust level weights
-                self.likelihoods = torch.tensor(self.likelihoods)
-                for i in range(J):
-                    self.levels[i].set_X(self.levels[i-1].get_X, self.likelihoods, self.p.history)
+            # Adjust level weights
+            for j in range(1, J):
+                self.levels[j].set_X(self.levels[j-1].get_X, self.chain, self.counter, C)
 
-                if J < self.max_level:
-
-                    # Add level
-                    boundary = torch.quantile(self.likelihoods, q=(1 - np.exp(-1)))
-                    self.likelihoods = self.likelihoods[self.likelihoods > boundary]
-                    self.levels.append(Level(index=J, likelihood_boundary=boundary))
-                    J += 1
-
-                # Remove likelihoods lower than new boundary
-                self.likelihoods = self.likelihoods[self.likelihoods > boundary].tolist()
-
-        # Return likelihoods afterwards
-        return torch.tensor(self.likelihoods), self.p
+        return self.chain, self.levels

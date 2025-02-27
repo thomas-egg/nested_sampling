@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 from diffusive_nested_sampling.particle import Particle
 from diffusive_nested_sampling.level import Level
 
@@ -7,7 +7,7 @@ Test MCMC shamelessly stolen from original Diffusive
 Nested Sampling Paper: https://arxiv.org/pdf/0912.2380. 
 '''
 
-def prob(level, J:int, l:float):
+def prob(level, J:int, l:float, in_bounds, max_level):
         '''
         Return joint distribution of particle position and level
 
@@ -15,10 +15,10 @@ def prob(level, J:int, l:float):
         @param J : Current max level
         @param l : Lambda value
         '''
-        return level.level_weight(j=J, l=l) / level.X
+        return (level.level_weight(j=J, l=l, max_level=max_level) / level.get_X) * in_bounds
 
 class MCMC(object):
-    def __init__(self, beta, likelihood_function, max_J, acc_rate=0.8):
+    def __init__(self, beta, likelihood_function, max_J, acc_rate, iterations=10000):
         '''
         Simple Monte Carlo implementation
 
@@ -29,6 +29,7 @@ class MCMC(object):
         self.acc_rate = acc_rate
         self.likelihood_function = likelihood_function
         self.max_J = max_J
+        self.iters = iterations
 
     def __call__(self, particle:Particle, levels, J, l):
         '''
@@ -40,41 +41,49 @@ class MCMC(object):
         @param l : lambda
         '''
         
-        # Set up proposal - Jeffreys Prior
-        S = (1e-6 - 1) * torch.rand(size=(1,)) + 1
-        S_prime = (1 - 10) * torch.rand(size=(1,)) + 10
-
-        # Position
+        xs = []
+        js = []
+        likelihoods = []
         j, x = particle.j, particle.pos
-        level = levels[j]
-        i = torch.randint(size=(1,), low=0, high=x.shape[-1]).item()
-        step = torch.zeros(x.shape)
-        step[i] = 1 / S
-        x_new = x + step
-        if self.likelihood_function(x_new) > levels[j].likelihood_bound:
-            x = x_new
-        else:
-            x = x
+        for _ in range(self.iters):
 
-        # Index
-        if J > 1:
-            j_new = torch.round(torch.normal(mean=float(j), std=S_prime)).clamp(min=0, max=J-1).long()
-        else:
-            j_new = j
-        new_level = levels[j_new]
+            # Set up proposal - Jeffreys Prior
+            S = 10**np.random.uniform(np.log10(10**-6), np.log10(1))
+            S_prime = 10**np.random.uniform(np.log10(1), np.log10(100))
 
-        # Acceptance
-        p_x_prime = prob(new_level, J, l)
-        p_x = prob(level, J, l)
-        a = p_x_prime / p_x
-        r = min(1, a)
-        u = torch.rand(size=(1,))
-        if u < r or u > self.acc_rate:
-            j = j_new
-        elif u < 0.5 and J == self.max_J:
-            j = j_new
-        else:
-            j = j
+            # Position
+            level = levels[j]
+            i = np.random.randint(low=0, high=x.shape[-1])
+            step = np.zeros(x.shape)
+            step[i] = 1
+            step *= np.random.uniform(-1/S, 1/S)
+            x_new = x + step
+    
+            # Index
+            j_new = np.clip(np.round(np.random.normal(loc=j, scale=S_prime)), 0, J).astype(int)
+            new_level = levels[j_new]
+
+            # Acceptance
+            in_bounds_new = self.likelihood_function(x_new) > new_level.likelihood_bound
+            p_x_prime = prob(level=new_level, J=J, l=l, in_bounds=in_bounds_new, max_level=self.max_J)
+            p_x = prob(level=level, J=J, l=l, in_bounds=True, max_level=self.max_J)
+            a = p_x_prime / p_x
+            r = min(1, a)
+            u = np.random.rand()
+            if u < r:
+                j = j_new
+                x = x_new
+            else:
+                j = j
+                x = x
+
+            # Accumulate points
+            xs.append(x)
+            js.append(j)
+            likelihoods.append(self.likelihood_function(x))
+        
+        # Assign particle state
+        particle.assign_state(new_pos=x, new_index=j)
 
         # Return
-        return x, j
+        return np.array(xs), np.array(js), np.array(likelihoods)
