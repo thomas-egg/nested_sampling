@@ -16,6 +16,7 @@ class Level(object):
         '''
         self.index = index 
         self.bound = likelihood_boundary
+        self.visits = 0
         if prev_X is not None:
             self.X = prev_X * np.exp(-1)
         else:
@@ -28,18 +29,19 @@ class Level(object):
         '''
         return self.bound
 
-    def level_weight(self, j:float, l:float, max_level:int):
+    def level_weight(self, j:float, l:float, max_level:int, chain_length:int):
         '''
         Exponentially decaying weight for this level
 
         @param j : current max level
         @param l : Lambda value for controlling backtracking
         '''
-        if j < max_level:
-            weight = np.exp((self.index - j + 1) / l)
+        if j < max_level - 1:
+            weight = np.exp((self.index - j) / l)
         else:
             weight = 1.0
-        return weight
+        weight /= self.get_X
+        return weight, self.visits, weight * chain_length
 
     @property
     def get_X(self):
@@ -57,9 +59,12 @@ class Level(object):
         @param history : level/likelihood history of particles
         @param C : confidence
         '''
-        js = np.array(chain['j'])
-        ls = np.array(chain['L'])
-        inds = js == self.index - 1
-        numerator = np.sum(ls[inds] > self.bound) + (C * np.exp(-1))
-        denominator = counter[self.index - 1].item() + C
-        self.X = preceeding_X * (numerator / denominator)
+        # js = np.array(chain['j'])
+        # ls = np.array(chain['L'])
+        # inds = js == self.index - 1
+        # numerator = np.sum(ls[inds] > self.bound) + (C * np.exp(-1))
+        # denominator = counter[self.index - 1].item() + C
+        # self.X = preceeding_X * (numerator / denominator)
+
+    def set_visits(self, n_visits):
+        self.visits = n_visits

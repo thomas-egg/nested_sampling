@@ -44,7 +44,7 @@ class DiffusiveNestedSampler(object):
         }
         self.counter = np.zeros(self.max_level)
 
-    def run_mcmc(self, particle, levels, J, L):
+    def run_mcmc(self, particle, levels, J, L, chain_length):
         '''
         Run MCMC for particle
 
@@ -53,8 +53,8 @@ class DiffusiveNestedSampler(object):
         @param J : number of levels
         @param L : lambda value
         '''
-        x, j, l = self.sampler(particle, levels, J, L)
-        return x, j, l
+        p, x, j, l = self.sampler(particle, levels, J, L, chain_length)
+        return p, x, j, l
 
     def __call__(self, nsteps, L=10, C=1000):
         '''
@@ -64,36 +64,43 @@ class DiffusiveNestedSampler(object):
         @param L : lambda value
         '''
         J = 0
+        all_js = np.array([])
         for i in tqdm(range(int(nsteps / (self.n * self.sampler.iters)))):
+
+            # Run MC here
+            with Pool(self.n) as pool:
+                results = pool.starmap(self.run_mcmc, [(p, self.levels, J, L, len(self.chain['j'])) for p in self.p])
+                new_p, new_x, new_j, new_L = zip(*results)
+                self.p = new_p
+                new_x = np.concatenate(new_x, axis=0)
+                new_j = np.concatenate(new_j, axis=0)
+                new_L = np.concatenate(new_L, axis=0)                
+                self.chain['x'] = np.concatenate((self.chain['x'], new_x), axis=0)
+                self.chain['j'] = np.concatenate((self.chain['j'], new_j), axis=0)
+                self.chain['L'] = np.concatenate((self.chain['L'], new_L), axis=0)
+                all_js = np.concatenate((all_js, new_j), axis=0)
+                filtered_new_j = new_j[new_j < J]
+                self.counter += np.bincount(filtered_new_j, minlength=len(self.counter))
 
             if J < (self.max_level - 1):
 
                 # Add level
+                J += 1
                 likelihoods = torch.tensor(self.chain['L']).to(self.device)
                 boundary = torch.quantile(likelihoods, q=(1 - np.exp(-1))).item()
-                self.levels.append(Level(index=J, likelihood_boundary=boundary, prev_X=self.levels[J].get_X))
-                J += 1
+                self.levels.append(Level(index=J, likelihood_boundary=boundary, prev_X=self.levels[J-1].get_X))
 
                 # Remove points lower than new boundary
                 inds = likelihoods > boundary
                 inds = inds.cpu().numpy()
-                self.chain['x'] = np.array(self.chain['x'])[inds].tolist()
-                self.chain['j'] = np.array(self.chain['j'])[inds].tolist()
-                self.chain['L'] = np.array(self.chain['L'])[inds].tolist()
-
-            # Run MC here
-            with Pool(self.n) as pool:
-                results = pool.starmap(self.run_mcmc, [(p, self.levels, J, L) for p in self.p])
-                new_x, new_j, new_L = zip(*results)
-                for j in range(len(self.p)):
-                    self.chain['x'].extend(new_x[j])
-                    self.chain['j'].extend(new_j[j])
-                    self.chain['L'].extend(new_L[j])
-                    filtered_new_j = new_j[j][new_j[j] < J]
-                    self.counter += np.bincount(filtered_new_j, minlength=len(self.counter))
+                self.chain['x'] = np.array(self.chain['x'])[inds]
+                self.chain['j'] = np.array(self.chain['j'])[inds]
+                self.chain['L'] = np.array(self.chain['L'])[inds]
 
             # Adjust level weights
-            for j in range(1, J):
-                self.levels[j].set_X(self.levels[j-1].get_X, self.chain, self.counter, C)
+            for j in range(J):
+                self.levels[j].set_visits(np.sum(all_js == j))
+                if j > 1:
+                    self.levels[j].set_X(self.levels[j-1].get_X, self.chain, self.counter, C)
 
-        return self.chain, self.levels
+        return self.chain, self.levels, all_js
