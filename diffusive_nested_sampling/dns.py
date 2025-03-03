@@ -35,7 +35,7 @@ class DiffusiveNestedSampler(object):
         self.device = device
 
         # Initialize particles
-        pos = np.random.uniform(low=0.0, high=1.0, size=dim)
+        pos = np.random.uniform(low=-0.5, high=0.5, size=dim)
         self.p = [Particle(pos, 0) for _ in range(n_particles)]
         self.chain = {
             'x' : [p.pos for p in self.p],
@@ -82,7 +82,7 @@ class DiffusiveNestedSampler(object):
                 filtered_new_j = new_j[new_j < J]
                 self.counter += np.bincount(filtered_new_j, minlength=len(self.counter))
 
-            if J < (self.max_level - 1):
+            if J < self.max_level:
 
                 # Add level
                 J += 1

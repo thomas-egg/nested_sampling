@@ -36,7 +36,7 @@ class Level(object):
         @param j : current max level
         @param l : Lambda value for controlling backtracking
         '''
-        if j < max_level - 1:
+        if j < max_level:
             weight = np.exp((self.index - j) / l)
         else:
             weight = 1.0

@@ -18,7 +18,7 @@ class MCMC(object):
         self.beta = beta
         self.acc_rate = acc_rate
         self.likelihood_function = likelihood_function
-        self.max_J = max_J - 1
+        self.max_J = max_J
         self.iters = iterations
         self.C = C
 
@@ -46,11 +46,16 @@ class MCMC(object):
             level = levels[j]
             i = np.random.randint(low=0, high=x.shape[-1])
             step = np.zeros(x.shape)
-            step[i] = 1.0
-            step *= np.random.uniform(-1/S, 1/S)
-            x_new = x + step
-    
-            # Index
+            step[i] = np.random.uniform(-1/S, 1/S)
+            x_new = np.clip(x + step, -0.5, 0.5)
+
+            # Update x
+            if self.likelihood_function(x_new) > level.likelihood_bound:
+                x = x_new
+            else:
+                x = x
+
+            # Update level
             j_new = np.round(np.random.normal(loc=j, scale=S_prime)).astype(int)
             if j_new > J or j_new < 0:
                 xs.append(x)
@@ -58,11 +63,10 @@ class MCMC(object):
                 likelihoods.append(self.likelihood_function(x))
                 continue
 
-            # Update level
             new_level = levels[j_new]
             j_weight, j_visits, j_exp_visits = level.level_weight(j=J, l=l, max_level=self.max_J, chain_length=chain_length)
             j_prime_weight, j_prime_visits, j_prime_exp_visits = new_level.level_weight(j=J, l=l, max_level=self.max_J, chain_length=chain_length)
-            a = (j_prime_weight / j_weight) * (((j_visits + self.C) / (j_exp_visits + self.C)) / ((j_prime_visits + self.C) / (j_prime_exp_visits + self.C))) ** self.beta
+            a = (self.likelihood_function(x) > new_level.likelihood_bound) * (j_prime_weight / j_weight)# * (((j_visits + self.C) / (j_exp_visits + self.C)) / ((j_prime_visits + self.C) / (j_prime_exp_visits + self.C))) ** self.beta
             r = min(1, a)
             u = np.random.rand()
             if u < r:
@@ -70,18 +74,13 @@ class MCMC(object):
             else:
                 j = j
 
-            if self.likelihood_function(x_new) > levels[j].likelihood_bound:
-                x = x_new
-            else:
-                x = x
-
             # Accumulate points
             xs.append(x)
             js.append(j)
             likelihoods.append(self.likelihood_function(x))
         
         # Assign particle state
-        particle.assign_state(new_pos=x, new_index=j)
+        particle.assign_state(new_pos=xs[-1], new_index=js[-1])
 
         # Return
         return particle, np.array(xs), np.array(js), np.array(likelihoods)
