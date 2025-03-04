@@ -8,7 +8,7 @@ Nested Sampling Paper: https://arxiv.org/pdf/0912.2380.
 '''
 
 class MCMC(object):
-    def __init__(self, beta, likelihood_function, max_J, acc_rate, iterations=10000, C=1000):
+    def __init__(self, beta, log_likelihood_function, max_J, acc_rate, iterations=10000, C=1000):
         '''
         Simple Monte Carlo implementation
 
@@ -17,12 +17,12 @@ class MCMC(object):
         '''
         self.beta = beta
         self.acc_rate = acc_rate
-        self.likelihood_function = likelihood_function
+        self.log_likelihood_function = log_likelihood_function
         self.max_J = max_J
         self.iters = iterations
         self.C = C
 
-    def __call__(self, particle:Particle, levels, J, l, chain_length):
+    def __call__(self, particle:Particle, levels, J, l):
         '''
         Run sampling iteration
 
@@ -34,7 +34,10 @@ class MCMC(object):
         
         xs = []
         js = []
-        likelihoods = []
+        log_likelihoods = []
+        total_visits = np.zeros(J+1)
+        visits_x_adj = np.zeros(J+1)
+        exceeds = np.zeros(J+1)
         j, x = particle.j, particle.pos
         for _ in range(self.iters):
 
@@ -44,29 +47,25 @@ class MCMC(object):
 
             # Position
             level = levels[j]
-            i = np.random.randint(low=0, high=x.shape[-1])
-            step = np.zeros(x.shape)
+            i = np.random.randint(x.shape[-1])
+            step = np.zeros_like(x)
             step[i] = np.random.uniform(-1/S, 1/S)
             x_new = np.clip(x + step, -0.5, 0.5)
 
             # Update x
-            if self.likelihood_function(x_new) > level.likelihood_bound:
+            new_logL = self.log_likelihood_function(x_new)
+            if new_logL > level.log_likelihood_bound:
                 x = x_new
             else:
+                new_logL = self.log_likelihood_function(x)
                 x = x
 
             # Update level
-            j_new = np.round(np.random.normal(loc=j, scale=S_prime)).astype(int)
-            if j_new > J or j_new < 0:
-                xs.append(x)
-                js.append(j)
-                likelihoods.append(self.likelihood_function(x))
-                continue
-
+            j_new = int(np.clip(np.random.normal(loc=j, scale=S_prime), 0, J))
             new_level = levels[j_new]
-            j_weight, j_visits, j_exp_visits = level.level_weight(j=J, l=l, max_level=self.max_J, chain_length=chain_length)
-            j_prime_weight, j_prime_visits, j_prime_exp_visits = new_level.level_weight(j=J, l=l, max_level=self.max_J, chain_length=chain_length)
-            a = (self.likelihood_function(x) > new_level.likelihood_bound) * (j_prime_weight / j_weight)# * (((j_visits + self.C) / (j_exp_visits + self.C)) / ((j_prime_visits + self.C) / (j_prime_exp_visits + self.C))) ** self.beta
+            j_log_weight = level.level_weight(j=J, l=l, max_level=self.max_J)
+            j_prime_log_weight = new_level.level_weight(j=J, l=l, max_level=self.max_J)
+            a = (new_logL > new_level.log_likelihood_bound) * np.exp(j_prime_log_weight - j_log_weight) 
             r = min(1, a)
             u = np.random.rand()
             if u < r:
@@ -74,13 +73,21 @@ class MCMC(object):
             else:
                 j = j
 
-            # Accumulate points
-            xs.append(x)
-            js.append(j)
-            likelihoods.append(self.likelihood_function(x))
+            # Accumulate quantities
+            if j < J:
+                visits_x_adj[j] += 1
+                if new_logL > levels[j+1].log_likelihood_bound:
+                    exceeds[j] += 1
+            total_visits[j] += 1
+
+            # Thin chain
+            if i % 1000 == 0:
+                xs.append(x)
+                js.append(j)
+                log_likelihoods.append(self.log_likelihood_function(x))
         
         # Assign particle state
         particle.assign_state(new_pos=xs[-1], new_index=js[-1])
 
         # Return
-        return particle, np.array(xs), np.array(js), np.array(likelihoods)
+        return particle, np.array(xs), np.array(js), np.array(log_likelihoods), total_visits, visits_x_adj, exceeds

@@ -11,7 +11,7 @@ from diffusive_nested_sampling.dns import DiffusiveNestedSampler
 from diffusive_nested_sampling.mc import MCMC
 
 # Likelihood function
-def likelihood(x):
+def log_likelihood(x):
     '''
     20-D spike and slab likelihood function
 
@@ -25,16 +25,17 @@ def likelihood(x):
     t1 = np.sum(-0.5 * (x / v) ** 2) - x.size * np.log(v * np.sqrt(2 * np.pi))
     
     # Slab
-    t2 = np.sum(-0.5 * ((x - 0.031) / u) ** 2) - x.size * np.log(u * np.sqrt(2 * np.pi))
-    
-    return (np.exp(t1) + (100 * np.exp(t2)))
+    t2 = np.sum(-0.5 * ((x - 0.031) / u) ** 2) - x.size * np.log(u * np.sqrt(2 * np.pi)) + np.log(100.0)
+
+    logL = np.logaddexp(t1, t2)
+    return logL
 
 # Instantiate sampler
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    sampler = MCMC(beta=10, likelihood_function=likelihood, max_J=100, acc_rate=0.25, iterations=10000)
-    dns = DiffusiveNestedSampler(likelihood, n_particles=1, dim=20, max_level=100, sampler=sampler, device=device)
+    sampler = MCMC(beta=10, log_likelihood_function=log_likelihood, max_J=100, acc_rate=0.25, iterations=10000)
+    dns = DiffusiveNestedSampler(log_likelihood, n_particles=5, dim=20, max_level=100, sampler=sampler, device=device)
 
     # Run sampler
-    chain, levels, js = dns(nsteps=1300000, L=10.0)
+    chain, levels, js = dns(nsteps=2000000, L=10.0)
     return chain, levels, js

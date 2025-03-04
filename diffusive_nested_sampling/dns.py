@@ -16,19 +16,19 @@ the normalizing constant (partition function)
 
 set_start_method('spawn', force=True)
 class DiffusiveNestedSampler(object):
-    def __init__(self, likelihood_func, n_particles, dim, max_level, sampler, device='cpu'):
+    def __init__(self, log_likelihood_func, n_particles, dim, max_level, sampler, device='cpu'):
         '''
         Initialize sampler
 
-        @param likelihood_func : likelihood function
+        @param log_likelihood_func : log_likelihood function
         @param n_particles : number of particles for sampler
         @param L : lambda value for backtracking control
         @param dim : dimensionality of system
         @param max_level : maximum number of levels
         '''
-        self.likelihood_func = likelihood_func
+        self.log_likelihood_func = log_likelihood_func
         self.n = n_particles
-        self.levels = [Level(0, 0.0, prev_X=None)]
+        self.levels = [Level(0, np.log(0.0), prev=None)]
         self.max_level = max_level
         self.sampler = sampler
         self.sampler.iters = int(self.sampler.iters / self.n)
@@ -40,11 +40,11 @@ class DiffusiveNestedSampler(object):
         self.chain = {
             'x' : [p.pos for p in self.p],
             'j' : [p.j for p in self.p],
-            'L' : [self.likelihood_func(particle.pos) for particle in self.p]
+            'L' : [self.log_likelihood_func(particle.pos) for particle in self.p]
         }
         self.counter = np.zeros(self.max_level)
 
-    def run_mcmc(self, particle, levels, J, L, chain_length):
+    def run_mcmc(self, particle, levels, J, L):
         '''
         Run MCMC for particle
 
@@ -53,14 +53,14 @@ class DiffusiveNestedSampler(object):
         @param J : number of levels
         @param L : lambda value
         '''
-        p, x, j, l = self.sampler(particle, levels, J, L, chain_length)
-        return p, x, j, l
+        p, x, j, l, t, a, e = self.sampler(particle, levels, J, L)
+        return p, x, j, l, t, a, e
 
-    def __call__(self, nsteps, L=10, C=1000):
+    def __call__(self, nsteps, L=10.0, C=1000):
         '''
         Call DNS
 
-        @param iter_per_level : likelihood evaluations per level created
+        @param iter_per_level : log_likelihood evaluations per level created
         @param L : lambda value
         '''
         J = 0
@@ -69,38 +69,39 @@ class DiffusiveNestedSampler(object):
 
             # Run MC here
             with Pool(self.n) as pool:
-                results = pool.starmap(self.run_mcmc, [(p, self.levels, J, L, len(self.chain['j'])) for p in self.p])
-                new_p, new_x, new_j, new_L = zip(*results)
+                results = pool.starmap(self.run_mcmc, [(p, self.levels, J, L) for p in self.p])
+                new_p, new_x, new_j, new_L, new_t, new_a, new_e = zip(*results)
                 self.p = new_p
                 new_x = np.concatenate(new_x, axis=0)
                 new_j = np.concatenate(new_j, axis=0)
-                new_L = np.concatenate(new_L, axis=0)                
+                new_L = np.concatenate(new_L, axis=0)
+                sum_t = np.sum(new_t, axis=0)
+                sum_a = np.sum(new_a, axis=0)
+                sum_e = np.sum(new_e, axis=0)
                 self.chain['x'] = np.concatenate((self.chain['x'], new_x), axis=0)
                 self.chain['j'] = np.concatenate((self.chain['j'], new_j), axis=0)
                 self.chain['L'] = np.concatenate((self.chain['L'], new_L), axis=0)
                 all_js = np.concatenate((all_js, new_j), axis=0)
-                filtered_new_j = new_j[new_j < J]
-                self.counter += np.bincount(filtered_new_j, minlength=len(self.counter))
+
+            # Adjust level weights
+            for j in range(0, len(self.levels)):
+                self.levels[j].set_visits(total=sum_t[j], x_adj=sum_a[j], exceeds=sum_e[j])
+                if j > 1:
+                    self.levels[j].set_log_X(self.levels[j-1].get_log_X, C)
 
             if J < self.max_level:
 
                 # Add level
                 J += 1
-                likelihoods = torch.tensor(self.chain['L']).to(self.device)
-                boundary = torch.quantile(likelihoods, q=(1 - np.exp(-1))).item()
-                self.levels.append(Level(index=J, likelihood_boundary=boundary, prev_X=self.levels[J-1].get_X))
+                log_likelihoods = torch.tensor(self.chain['L']).to(self.device)
+                boundary = torch.quantile(log_likelihoods, q=(1 - np.exp(-1))).item()
+                self.levels.append(Level(index=J, log_likelihood_boundary=boundary, prev=self.levels[J-1].get_log_X))
 
                 # Remove points lower than new boundary
-                inds = likelihoods > boundary
+                inds = log_likelihoods > boundary
                 inds = inds.cpu().numpy()
                 self.chain['x'] = np.array(self.chain['x'])[inds]
                 self.chain['j'] = np.array(self.chain['j'])[inds]
                 self.chain['L'] = np.array(self.chain['L'])[inds]
-
-            # Adjust level weights
-            for j in range(J):
-                self.levels[j].set_visits(np.sum(all_js == j))
-                if j > 1:
-                    self.levels[j].set_X(self.levels[j-1].get_X, self.chain, self.counter, C)
 
         return self.chain, self.levels, all_js
