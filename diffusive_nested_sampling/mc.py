@@ -39,7 +39,7 @@ class MCMC(object):
         visits_x_adj = np.zeros(J+1)
         exceeds = np.zeros(J+1)
         j, x = particle.j, particle.pos
-        for _ in range(self.iters):
+        for i in range(self.iters):
 
             # Set up proposal - Jeffreys Prior
             S = 10**np.random.uniform(np.log10(10**-6), np.log10(1))
@@ -47,9 +47,9 @@ class MCMC(object):
 
             # Position
             level = levels[j]
-            i = np.random.randint(x.shape[-1])
+            ind = np.random.randint(0, x.shape[-1], size=1)
             step = np.zeros_like(x)
-            step[i] = np.random.uniform(-1/S, 1/S)
+            step[ind] = np.random.uniform(-1/S, 1/S)
             x_new = np.clip(x + step, -0.5, 0.5)
 
             # Update x
@@ -79,15 +79,15 @@ class MCMC(object):
                 if new_logL > levels[j+1].log_likelihood_bound:
                     exceeds[j] += 1
             total_visits[j] += 1
+            log_likelihoods.append(new_logL)
 
             # Thin chain
-            if i % 1000 == 0:
+            if i % 5000 == 0:
                 xs.append(x)
                 js.append(j)
-                log_likelihoods.append(self.log_likelihood_function(x))
         
         # Assign particle state
-        particle.assign_state(new_pos=xs[-1], new_index=js[-1])
+        particle.assign_state(new_pos=x, new_index=j)
 
         # Return
         return particle, np.array(xs), np.array(js), np.array(log_likelihoods), total_visits, visits_x_adj, exceeds

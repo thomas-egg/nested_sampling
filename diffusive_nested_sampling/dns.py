@@ -93,15 +93,13 @@ class DiffusiveNestedSampler(object):
 
                 # Add level
                 J += 1
-                log_likelihoods = torch.tensor(self.chain['L']).to(self.device)
+                log_likelihoods = torch.tensor(self.chain['L'])#.to(self.device)
                 boundary = torch.quantile(log_likelihoods, q=(1 - np.exp(-1))).item()
                 self.levels.append(Level(index=J, log_likelihood_boundary=boundary, prev=self.levels[J-1].get_log_X))
 
                 # Remove points lower than new boundary
                 inds = log_likelihoods > boundary
                 inds = inds.cpu().numpy()
-                self.chain['x'] = np.array(self.chain['x'])[inds]
-                self.chain['j'] = np.array(self.chain['j'])[inds]
                 self.chain['L'] = np.array(self.chain['L'])[inds]
 
         return self.chain, self.levels, all_js
