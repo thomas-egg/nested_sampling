@@ -19,6 +19,7 @@ class Level(object):
         self.total_visits = 0
         self.visits_x_adj = 0
         self.exceeds = 0
+        self.exp_visits = 0
         if prev is not None:
             self.log_X = prev - 1
         else:
@@ -31,15 +32,15 @@ class Level(object):
         '''
         return self.bound
 
-    def level_weight(self, j:float, l:float, max_level:int):
+    def level_weight(self, J:float, l:float, max_level:int):
         '''
         Exponentially decaying weight for this level
 
         @param j : current max level
         @param l : Lambda value for controlling backtracking
         '''
-        if j < max_level:
-            log_weight = (self.index - j) / l
+        if J < max_level:
+            log_weight = (self.index - J) / l
         else:
             log_weight = 0.0
         log_weight -= self.log_X
@@ -65,7 +66,11 @@ class Level(object):
         denominator = self.visits_x_adj + C
         self.log_X = preceeding_log_X + np.log(numerator / denominator)
 
-    def set_visits(self, total, x_adj, exceeds):
+    def set_visits(self, total, x_adj, exceeds, exp_visits):
         self.total_visits += total
         self.visits_x_adj += x_adj
         self.exceeds += exceeds
+        self.exp_visits += exp_visits
+
+    def get_visits_acceptance(self):
+        return self.total_visits, self.exp_visits

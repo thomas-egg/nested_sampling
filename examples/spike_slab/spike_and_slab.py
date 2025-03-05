@@ -32,10 +32,10 @@ def log_likelihood(x):
 
 # Instantiate sampler
 def main():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    sampler = MCMC(beta=10, log_likelihood_function=log_likelihood, max_J=100, acc_rate=0.25, iterations=15000)
-    dns = DiffusiveNestedSampler(log_likelihood, n_particles=1, dim=20, max_level=100, sampler=sampler, device=device)
+    max_level = 200
+    sampler = MCMC(beta=10, log_likelihood_function=log_likelihood, max_J=max_level, iterations=10000)
+    dns = DiffusiveNestedSampler(n_particles=12, dim=20, max_level=max_level, sampler=sampler)
 
     # Run sampler
-    chain, levels, js = dns(nsteps=5000000, L=10.0, C=10000)
-    return chain, levels, js 
+    chain, levels, js = dns(nsteps=5000000)
+    return chain, levels, js
