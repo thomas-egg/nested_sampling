@@ -41,15 +41,17 @@ class MCMC(object):
         for i in range(self.iters):
 
             # Set up proposal - Jeffreys Prior
-            S = 10**np.random.uniform(np.log10(1), np.log(10))
+            S = 10**np.random.uniform(np.log10(1.0), np.log10(10.0))
             S_prime = 10**np.random.uniform(np.log10(1.0), np.log10(100.0))
 
             # Proposals
-            ind = np.random.randint(x.shape, size=1)
+            ind = np.random.randint(x.shape, size=2)
             step = np.zeros_like(x)
-            step[ind] = np.random.uniform(-1/S, 1/S, size=1)
+            step[ind] = np.random.uniform(-1/S, 1/S, size=2)
             x_new = np.clip(x + step, -0.5, 0.5)
-            j_new = int(np.random.normal(loc=j, scale=S_prime))
+            j_new = int(np.clip(np.random.normal(loc=j, scale=S_prime), 0, J))
+            if j_new == j and 0 < j_new < J:
+                j_new += np.random.choice([-1, 1])
 
             # Compute likelihoods
             new_logL = self.log_likelihood_function(x_new)
@@ -60,10 +62,7 @@ class MCMC(object):
                 x = x
 
             # Update level
-            if j_new >= 0 and j_new <= J:
-                a = (new_logL > levels.get_level(j_new).log_likelihood_bound) * levels.get_acceptance_ratio(j, j_new, self.beta)
-            else:
-                a = 0.0
+            a = (new_logL > levels.get_level(j_new).log_likelihood_bound) * levels.get_acceptance_ratio(j, j_new, self.beta)
             r = min(1, a)
             u = np.random.rand()
             if u < r:

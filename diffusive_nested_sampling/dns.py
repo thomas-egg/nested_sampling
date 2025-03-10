@@ -94,4 +94,5 @@ class DiffusiveNestedSampler(object):
                 inds = self.chain['L'] >= boundary
                 self.chain['L'] = self.chain['L'][inds]
 
+
         return self.chain, self.levels, all_js

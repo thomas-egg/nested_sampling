@@ -100,7 +100,7 @@ class Levels(object):
         if self.current_max_J == self.max_J:
            visits_j, exp_j = self.levels[j].get_visits()
            visits_k, exp_k = self.levels[k].get_visits()
-           a *= (((visits_j + self.C) / (exp_j + self.C)) / ((visits_k + self.C) / (exp_k + self.C))) ** beta
+           a *= ((visits_j + self.C) / (visits_k + self.C)) ** beta
 
         # Return
         return a
