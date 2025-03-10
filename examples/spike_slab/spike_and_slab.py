@@ -33,8 +33,8 @@ def log_likelihood(x):
 # Instantiate sampler
 def main():
     max_level = 200
-    sampler = MCMC(beta=10, log_likelihood_function=log_likelihood, max_J=max_level, iterations=10000)
-    dns = DiffusiveNestedSampler(n_particles=12, dim=20, max_level=max_level, sampler=sampler)
+    sampler = MCMC(beta=10, log_likelihood_function=log_likelihood, max_J=max_level, iterations=14000)
+    dns = DiffusiveNestedSampler(n_particles=1, dim=20, max_level=max_level, sampler=sampler)
 
     # Run sampler
     chain, levels, js = dns(nsteps=5000000)

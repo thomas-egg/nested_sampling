@@ -92,8 +92,6 @@ class DiffusiveNestedSampler(object):
 
                 # Remove points lower than new boundary
                 inds = self.chain['L'] >= boundary
-                #self.chain['x'] = self.chain['x'][inds]
-                #self.chain['j'] = self.chain['j'][inds]
                 self.chain['L'] = self.chain['L'][inds]
 
         return self.chain, self.levels, all_js

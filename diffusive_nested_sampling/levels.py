@@ -65,11 +65,13 @@ class Levels(object):
         """
         total_visits = np.sum(new_visits, axis=0)
         for i in range(self.current_max_J + 1):
-            exp_visits_i = np.exp(self.levels[i].level_weight(self.current_max_J, self.L, self.max_J)) * total_visits
+            exp_visits_i = (np.exp(self.levels[i].level_weight(self.current_max_J, self.L, self.max_J)) * total_visits)
             self.levels[i].set_visits(new_visits[i], new_visits_xadj[i], exceeds[i], exp_visits_i)
             if i > 0:
                 prev_log_X = self.levels[i-1].get_log_X
-                self.levels[i].set_log_X(prev_log_X, self.C)
+                prev_j = self.levels[i-1].visits_x_adj
+                prev_exceeds = self.levels[i-1].exceeds
+                self.levels[i].set_log_X(prev_log_X, prev_j, prev_exceeds, self.C)
 
     def get_acceptance_ratio(self, j: int, k: int, beta: float):
         """
@@ -92,12 +94,12 @@ class Levels(object):
         """
 
         # Compute acceptance
-        w_prime = self.levels[k].level_weight(self.current_max_J, self.L, self.max_J)
-        w = self.levels[j].level_weight(self.current_max_J, self.L, self.max_J)
+        w_prime = self.levels[k].level_weight(self.current_max_J, self.L, self.max_J) - self.levels[k].get_log_X
+        w = self.levels[j].level_weight(self.current_max_J, self.L, self.max_J) - self.levels[j].get_log_X
         a = np.exp(w_prime - w)
         if self.current_max_J == self.max_J:
-           visits_j, exp_j = self.levels[j].get_visits_acceptance()
-           visits_k, exp_k = self.levels[k].get_visits_acceptance()
+           visits_j, exp_j = self.levels[j].get_visits()
+           visits_k, exp_k = self.levels[k].get_visits()
            a *= (((visits_j + self.C) / (exp_j + self.C)) / ((visits_k + self.C) / (exp_k + self.C))) ** beta
 
         # Return

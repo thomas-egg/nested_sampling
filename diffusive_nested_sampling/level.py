@@ -42,8 +42,7 @@ class Level(object):
         if J < max_level:
             log_weight = (self.index - J) / l
         else:
-            log_weight = 0.0
-        log_weight -= self.log_X
+            log_weight = np.log(1.0 / (max_level + 1))
         return log_weight
 
     @property
@@ -53,7 +52,7 @@ class Level(object):
         '''
         return self.log_X
 
-    def set_log_X(self, preceeding_log_X, C=1000):
+    def set_log_X(self, prev_log_X: float, prev_j: int, prev_exceeds: int, C: int=1000):
         '''
         Compute phase space volume element of level given the history of 
         particle
@@ -62,9 +61,9 @@ class Level(object):
         @param history : level/log_likelihood history of particles
         @param C : confidence
         '''
-        numerator = self.exceeds + (C * np.exp(-1))
-        denominator = self.visits_x_adj + C
-        self.log_X = preceeding_log_X + np.log(numerator / denominator)
+        numerator = prev_exceeds + (C * np.exp(-1))
+        denominator = prev_j + C
+        self.log_X = prev_log_X + np.log(numerator / denominator)
 
     def set_visits(self, total, x_adj, exceeds, exp_visits):
         self.total_visits += total
@@ -72,5 +71,5 @@ class Level(object):
         self.exceeds += exceeds
         self.exp_visits += exp_visits
 
-    def get_visits_acceptance(self):
+    def get_visits(self):
         return self.total_visits, self.exp_visits
