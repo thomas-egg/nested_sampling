@@ -37,9 +37,7 @@ class DiffusiveNestedSampler(object):
         pos = np.random.uniform(low=-0.5, high=0.5, size=dim)
         self.p = [Particle(pos, 0) for _ in range(n_particles)]
         self.chain = {
-            'x' : [p.pos for p in self.p],
-            'j' : [p.j for p in self.p],
-            'L' : [-float('inf') for particle in self.p]
+            'L' : [-float('inf')]
         }
 
     def run_mcmc(self, particle, levels):
@@ -51,8 +49,8 @@ class DiffusiveNestedSampler(object):
         @param J : number of levels
         @param L : lambda value
         '''
-        p, x, j, l, visits, xadj, exceeds = self.sampler(particle, levels)
-        return p, x, j, l, visits, xadj, exceeds
+        p, l, l_above, visits, xadj, exceeds = self.sampler(particle, levels)
+        return p, l, l_above, visits, xadj, exceeds
 
     def __call__(self, nsteps):
         '''
@@ -62,31 +60,27 @@ class DiffusiveNestedSampler(object):
         @param L : lambda value
         '''
         J = 0
-        all_js = np.array([])
         for _ in tqdm(range(int(nsteps / (self.n * self.sampler.iters)))):
 
             # Run MC here
             with Pool(self.n) as pool:
                 results = pool.starmap(self.run_mcmc, [(p, self.levels) for p in self.p])
-                new_p, new_x, new_j, new_L, new_visits, new_xadj, new_exceeds = zip(*results)
+                new_p, new_L, new_L_above, new_visits, new_xadj, new_exceeds = zip(*results)
                 self.p = new_p
-                new_x = np.concatenate(new_x, axis=0)
-                new_j = np.concatenate(new_j, axis=0)
+                new_L_above = np.concatenate(new_L_above, axis=0)
                 new_L = np.concatenate(new_L, axis=0)
-                self.chain['x'] = np.concatenate((self.chain['x'], new_x), axis=0)
-                self.chain['j'] = np.concatenate((self.chain['j'], new_j), axis=0)
-                self.chain['L'] = np.concatenate((self.chain['L'], new_L), axis=0)
-                all_js = np.concatenate((all_js, new_j), axis=0)
                 new_visits = np.sum(new_visits, axis=0)
                 new_xadj = np.sum(new_xadj, axis=0)
                 new_exceeds = np.sum(new_exceeds, axis=0)
+
+            # Build up likelihood chain
+            self.chain['L'] = np.concatenate([self.chain['L'], new_L])
 
             # Append
             if J < self.max_level:
 
                 # Add level
-                boundary = np.quantile(new_L, q=(1 - np.exp(-1)))
-                print(boundary)
+                boundary = np.quantile(new_L_above, q=(1 - np.exp(-1)))
                 self.levels.append(boundary=boundary)
 
                 # Remove points lower than new boundary
@@ -97,4 +91,4 @@ class DiffusiveNestedSampler(object):
             # Update levels
             self.levels.update_levels(new_visits, new_xadj, new_exceeds)
 
-        return self.chain, self.levels, all_js
+        return self.chain, self.levels, self.p

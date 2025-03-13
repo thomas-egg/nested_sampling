@@ -15,7 +15,11 @@ class Particle(object):
         '''
         
         self.x = init_pos
-        self.ind = init_index        
+        self.ind = init_index
+        self.history = {
+            'x' : [init_pos],
+            'j' : [init_index]
+        }
 
     @property
     def j(self):
@@ -31,7 +35,7 @@ class Particle(object):
         '''
         return self.x
     
-    def assign_state(self, new_pos:float, new_index:int):
+    def assign_state(self, new_pos: float, new_index: int):
         '''
         Change index
         
@@ -39,3 +43,5 @@ class Particle(object):
         '''
         self.x = new_pos
         self.ind = new_index
+        self.history['x'].append(new_pos)
+        self.history['j'].append(new_index)

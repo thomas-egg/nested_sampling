@@ -64,8 +64,11 @@ class Levels(object):
         :type exceeds: list
         """
 
+        normalizing_const = np.sum(np.exp([self.levels[i].level_weight(self.current_max_J, self.L, self.max_J) for i in range(self.current_max_J)]))
+        all_visits = np.sum(new_visits)
         for i in range(self.current_max_J):
-            self.levels[i].set_visits(new_visits[i], new_xadj[i], exceeds[i])
+            exp_visits = np.exp(self.levels[i].level_weight(self.current_max_J, self.L, self.max_J)) * all_visits / normalizing_const
+            self.levels[i].set_visits(new_visits[i], new_xadj[i], exceeds[i], exp_visits)
             if i < self.current_max_J:
                 self.levels[i+1].set_log_X(self.levels[i].get_log_X, self.levels[i].xadj_visits, self.levels[i].exceeds, self.C)
 
@@ -93,10 +96,10 @@ class Levels(object):
         w_prime = self.levels[k].level_weight(self.current_max_J, self.L, self.max_J) - self.levels[k].get_log_X
         w = self.levels[j].level_weight(self.current_max_J, self.L, self.max_J) - self.levels[j].get_log_X
         a = np.exp(w_prime - w)
-        # if self.current_max_J == self.max_J:
-        #    visits_j, exp_j = self.levels[j].get_visits()
-        #    visits_k, exp_k = self.levels[k].get_visits()
-        #    a *= (((visits_j + self.C) / (exp_j + self.C)) / ((visits_k + self.C) / (exp_k + self.C))) ** beta
+        if self.current_max_J == self.max_J:
+           visits_j, exp_j = self.levels[j].get_visits()
+           visits_k, exp_k = self.levels[k].get_visits()
+           a *= (((visits_j + self.C) / (exp_j + self.C)) / ((visits_k + self.C) / (exp_k + self.C))) ** beta
 
         # Return
         return a

@@ -28,7 +28,8 @@ class MCMC(object):
         ind = np.random.randint(x.shape, size=1)
         step = np.zeros_like(x)
         step[ind] = (10 ** (1.5 - 3 * np.abs(s))) * np.random.randn()
-        x_new = np.clip(x + step, -0.5, 0.5)
+        x_new = x + step
+        x_new = (x_new + 0.5) % 1 - 0.5
 
         # Compute likelihoods
         new_logL = self.log_likelihood_function(x_new)
@@ -67,15 +68,14 @@ class MCMC(object):
         @param l : lambda
         '''
         
-        xs = []
-        js = []
-        log_likelihoods = []
+        log_L_above = []
+        log_Ls = []
         total_visits = np.zeros(levels.current_max_J + 1)
         x_adj_visits = np.zeros(levels.current_max_J + 1)
         exceeds = np.zeros(levels.current_max_J + 1)
         j, x = particle.j, particle.pos
         i = 0
-        condition = lambda current_max_J: (len(log_likelihoods) < self.iters if current_max_J < self.max_J else i < self.iters)
+        condition = lambda current_max_J: (len(log_L_above) < self.iters if current_max_J < self.max_J else i < self.iters)
         while condition(levels.current_max_J):
 
             # MCMC step
@@ -95,11 +95,11 @@ class MCMC(object):
                     exceeds[j] += 1
 
             # Thin chain
+            log_Ls.append(new_logL)
             if new_logL > levels.get_level(levels.current_max_J).log_likelihood_bound:
-                log_likelihoods.append(new_logL)
-            if i % 1000 == 0:
-                xs.append(x)
-                js.append(j)
+                log_L_above.append(new_logL)
+            if i % 10000 == 0:
+                particle.assign_state(new_pos=x, new_index=j)
             
             # Increment i
             i += 1
@@ -108,4 +108,4 @@ class MCMC(object):
         particle.assign_state(new_pos=x, new_index=j)
 
         # Return
-        return particle, np.array(xs), np.array(js), np.array(log_likelihoods), total_visits, x_adj_visits, exceeds
+        return particle, np.array(log_Ls), np.array(log_L_above), total_visits, x_adj_visits, exceeds

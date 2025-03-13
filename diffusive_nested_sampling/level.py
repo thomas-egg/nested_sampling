@@ -65,10 +65,11 @@ class Level(object):
         denominator = prev_j + C
         self.log_X = prev_log_X + np.log(numerator / denominator)
 
-    def set_visits(self, total: int, xadj: int, exceeds: int):
+    def set_visits(self, total: int, xadj: int, exceeds: int, exp_visits: int):
         self.total_visits += total
         self.xadj_visits += xadj
         self.exceeds += exceeds
+        self.exp_visits += exp_visits
 
     def get_visits(self):
         return self.total_visits, self.exp_visits
