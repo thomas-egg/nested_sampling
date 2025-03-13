@@ -17,7 +17,7 @@ class Level(object):
         self.index = index 
         self.bound = log_likelihood_boundary
         self.total_visits = 0
-        self.visits_x_adj = 0
+        self.xadj_visits = 0
         self.exceeds = 0
         self.exp_visits = 0
         if prev is not None:
@@ -61,15 +61,14 @@ class Level(object):
         @param history : level/log_likelihood history of particles
         @param C : confidence
         '''
-        numerator = prev_exceeds + (C * np.exp(-1))
+        numerator = prev_exceeds + (C * np.exp(-1.0))
         denominator = prev_j + C
         self.log_X = prev_log_X + np.log(numerator / denominator)
 
-    def set_visits(self, total, x_adj, exceeds, exp_visits):
+    def set_visits(self, total: int, xadj: int, exceeds: int):
         self.total_visits += total
-        self.visits_x_adj += x_adj
+        self.xadj_visits += xadj
         self.exceeds += exceeds
-        self.exp_visits += exp_visits
 
     def get_visits(self):
         return self.total_visits, self.exp_visits
