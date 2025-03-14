@@ -37,5 +37,5 @@ def main():
     dns = DiffusiveNestedSampler(n_particles=1, dim=20, max_level=max_level, sampler=sampler, L=10.0)
 
     # Run sampler
-    chain, levels, particles = dns(nsteps=8000000)
+    chain, levels, particles = dns(nsteps=10000000)
     return chain, levels, particles
